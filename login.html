@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Central de Ferramentas — Entrar</title>
+
+  <script>
+    document.documentElement.dataset.theme = localStorage.getItem("ctf_tema") || "dark";
+  </script>
+
+  <link rel="stylesheet" href="assets/css/tokens.css" />
+  <link rel="stylesheet" href="assets/css/base.css" />
+  <link rel="stylesheet" href="assets/css/components.css" />
+  <style>
+    body { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+    .caixa-login { width: 100%; max-width: 380px; padding: 32px; }
+    .caixa-login .sidebar-brand { justify-content: center; margin-bottom: 24px; font-size: 18px; }
+    .abas-login { display: flex; gap: 6px; margin-bottom: 18px; border-bottom: 1px solid var(--border); }
+    .abas-login button { flex: 1; padding: 10px; background: none; border: none; color: var(--muted); font-weight: 600; font-size: 13px; border-bottom: 2px solid transparent; cursor: pointer; }
+    .abas-login button.ativa { color: var(--accent); border-bottom-color: var(--accent); }
+    #erro-login { color: var(--danger); font-size: 12px; margin-bottom: 10px; display: none; }
+  </style>
+</head>
+<body>
+  <div class="card caixa-login">
+    <div class="sidebar-brand">
+      <span class="dot"></span>
+      Central de Ferramentas
+    </div>
+
+    <div class="abas-login">
+      <button class="ativa" data-aba="entrar">Entrar</button>
+      <button data-aba="cadastrar">Criar conta</button>
+    </div>
+
+    <p id="erro-login"></p>
+
+    <div id="form-entrar">
+      <div class="field">
+        <label for="entrar-email">E-mail</label>
+        <input class="input" type="email" id="entrar-email" placeholder="voce@empresa.com" />
+      </div>
+      <div class="field">
+        <label for="entrar-senha">Senha</label>
+        <input class="input" type="password" id="entrar-senha" />
+      </div>
+      <button class="btn btn-primary" id="botao-entrar" style="width:100%; height:40px;">Entrar</button>
+    </div>
+
+    <div id="form-cadastrar" hidden>
+      <div class="field">
+        <label for="cad-nome">Nome</label>
+        <input class="input" id="cad-nome" placeholder="Seu nome" />
+      </div>
+      <div class="field">
+        <label for="cad-email">E-mail</label>
+        <input class="input" type="email" id="cad-email" placeholder="voce@empresa.com" />
+      </div>
+      <div class="field">
+        <label for="cad-senha">Senha</label>
+        <input class="input" type="password" id="cad-senha" placeholder="Mínimo 8 caracteres" />
+      </div>
+      <button class="btn btn-primary" id="botao-cadastrar" style="width:100%; height:40px;">Criar conta e entrar</button>
+    </div>
+  </div>
+
+  <script src="assets/js/config.js"></script>
+  <script src="assets/js/auth.js"></script>
+
+  <script>
+    if (estaLogado()) window.location.href = "index.html";
+
+    document.querySelectorAll(".abas-login button").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll(".abas-login button").forEach((b) => b.classList.remove("ativa"));
+        btn.classList.add("ativa");
+        document.getElementById("form-entrar").hidden = btn.dataset.aba !== "entrar";
+        document.getElementById("form-cadastrar").hidden = btn.dataset.aba !== "cadastrar";
+        document.getElementById("erro-login").style.display = "none";
+      });
+    });
+
+    function mostrarErro(msg) {
+      const el = document.getElementById("erro-login");
+      el.textContent = msg;
+      el.style.display = "block";
+    }
+
+    document.getElementById("botao-entrar").addEventListener("click", async () => {
+      const email = document.getElementById("entrar-email").value.trim();
+      const senha = document.getElementById("entrar-senha").value;
+      if (!email || !senha) return mostrarErro("Preencha e-mail e senha.");
+      try {
+        await fazerLogin(email, senha);
+        window.location.href = "index.html";
+      } catch (erro) {
+        mostrarErro(erro.message);
+      }
+    });
+
+    document.getElementById("botao-cadastrar").addEventListener("click", async () => {
+      const nome = document.getElementById("cad-nome").value.trim();
+      const email = document.getElementById("cad-email").value.trim();
+      const senha = document.getElementById("cad-senha").value;
+      if (!nome || !email || senha.length < 8) return mostrarErro("Preencha nome, e-mail e uma senha com 8+ caracteres.");
+      try {
+        await fazerCadastro(nome, email, senha);
+        window.location.href = "index.html";
+      } catch (erro) {
+        mostrarErro(erro.message);
+      }
+    });
+  </script>
+</body>
+</html>

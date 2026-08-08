@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Central de Ferramentas — Relatórios</title>
+
+  <script>
+    document.documentElement.dataset.theme = localStorage.getItem("ctf_tema") || "dark";
+  </script>
+
+  <link rel="stylesheet" href="../assets/css/tokens.css" />
+  <link rel="stylesheet" href="../assets/css/base.css" />
+  <link rel="stylesheet" href="../assets/css/components.css" />
+</head>
+<body data-module="relatorios">
+  <div class="app-shell">
+    <div id="app-sidebar"></div>
+    <div id="app-header"></div>
+
+    <main class="app-main">
+      <div class="page-header">
+        <div>
+          <h1>Meus Relatórios</h1>
+          <p style="color:var(--muted)">Combine métricas e tabelas em painéis com gráficos — seu "Power BI" local.</p>
+        </div>
+        <button class="btn btn-primary" id="botao-novo-relatorio">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 5v14M5 12h14"/></svg>
+          Novo relatório
+        </button>
+      </div>
+
+      <div id="lista-relatorios" class="grid-cards"></div>
+      <div id="estado-vazio" class="empty-state" hidden>
+        <h3>Nenhum relatório criado ainda</h3>
+        <p>Antes de começar, dá uma olhada em <a href="dados.html" style="color:var(--accent);">Dados</a> para ver as tabelas disponíveis, em <a href="metricas.html" style="color:var(--accent);">Métricas</a> para criar suas medidas, e em <a href="layouts.html" style="color:var(--accent);">Layouts</a> para começar com um modelo pronto.</p>
+      </div>
+    </main>
+  </div>
+
+  <div class="modal-backdrop" id="modal-backdrop" hidden>
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Novo relatório</h3>
+        <button class="icon-btn" id="modal-fechar" aria-label="Fechar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="field">
+        <label for="campo-nome">Nome do relatório *</label>
+        <input class="input" id="campo-nome" placeholder="Ex: Visão geral do financeiro" />
+      </div>
+      <div class="field">
+        <label for="campo-layout">Layout inicial</label>
+        <select class="input" id="campo-layout">
+          <option value="">Em branco</option>
+        </select>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="modal-cancelar">Cancelar</button>
+        <button class="btn btn-primary" id="modal-criar">Criar e abrir</button>
+      </div>
+    </div>
+  </div>
+
+  <script>const CTF_RAIZ = "../";</script>
+
+  <script src="../assets/js/utils.js"></script>
+  <script src="../assets/js/events.js"></script>
+  <script src="../assets/js/config.js"></script>
+  <script src="../assets/js/auth.js"></script>
+  <script src="../assets/js/db.js"></script>
+  <script src="../assets/js/catalogo-relatorios.js"></script>
+  <script src="../assets/js/catalogo-menu.js"></script>
+  <script src="../assets/js/partials.js"></script>
+  <script src="../assets/js/app-shell.js" defer></script>
+
+  <script defer>
+    function cardRelatorio(r) {
+      return `
+        <a class="card card-hover" style="display:block; cursor:pointer;" href="editor.html?id=${r.id}">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
+            <strong style="font-size:14px;">${r.nome}</strong>
+            <span class="badge ${r.publicado ? "badge--success" : "badge--warning"}">${r.publicado ? "Publicado" : "Rascunho"}</span>
+          </div>
+          <p style="font-size:12px; color:var(--muted); margin-top:6px;">${r.descricao || "Sem descrição"}</p>
+          <p style="font-size:11px; color:var(--muted); margin-top:10px;">${(r.blocos || []).length} bloco(s)</p>
+        </a>`;
+    }
+
+    function renderizarRelatorios() {
+      const relatorios = getAll("relatorios").sort((a, b) => (b.criadoEm || "").localeCompare(a.criadoEm || ""));
+      document.getElementById("lista-relatorios").innerHTML = relatorios.map(cardRelatorio).join("");
+      document.getElementById("estado-vazio").hidden = relatorios.length !== 0;
+    }
+
+    window.addEventListener("ctf:shell-pronto", () => {
+      renderizarRelatorios();
+      document.getElementById("campo-layout").innerHTML =
+        '<option value="">Em branco</option>' +
+        getAll("layouts").map((l) => `<option value="${l.id}">${l.nome} (${l.slots.length} blocos)</option>`).join("");
+      onDadosMudarem("relatorios", renderizarRelatorios);
+    });
+
+    function abrirModal() {
+      document.getElementById("campo-nome").value = "";
+      document.getElementById("modal-backdrop").hidden = false;
+      document.getElementById("campo-nome").focus();
+    }
+    function fecharModal() { document.getElementById("modal-backdrop").hidden = true; }
+
+    document.getElementById("botao-novo-relatorio").addEventListener("click", abrirModal);
+    document.getElementById("modal-fechar").addEventListener("click", fecharModal);
+    document.getElementById("modal-cancelar").addEventListener("click", fecharModal);
+    document.getElementById("modal-backdrop").addEventListener("click", (e) => { if (e.target.id === "modal-backdrop") fecharModal(); });
+    document.getElementById("modal-criar").addEventListener("click", () => {
+      const nome = document.getElementById("campo-nome").value.trim();
+      if (!nome) { document.getElementById("campo-nome").focus(); return; }
+
+      const ROTULOS_TIPO = { kpi: "Número", barras: "Barras", colunas: "Colunas", rosca: "Rosca", tabela: "Tabela" };
+      const layoutId = document.getElementById("campo-layout").value;
+      const layout = layoutId ? getPorId("layouts", layoutId) : null;
+      const blocos = layout
+        ? layout.slots.map((slot) => ({ id: gerarId(), tipo: slot.tipo, largura: slot.largura, titulo: `Configurar bloco (${ROTULOS_TIPO[slot.tipo]})` }))
+        : [];
+
+      const novo = inserir("relatorios", { nome, descricao: "", publicado: false, blocos });
+      window.location.href = `editor.html?id=${novo.id}`;
+    });
+  </script>
+</body>
+</html>

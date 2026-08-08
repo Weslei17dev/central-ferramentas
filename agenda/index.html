@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Central de Ferramentas — Agenda</title>
+
+  <script>
+    document.documentElement.dataset.theme = localStorage.getItem("ctf_tema") || "dark";
+  </script>
+
+  <link rel="stylesheet" href="../assets/css/tokens.css" />
+  <link rel="stylesheet" href="../assets/css/base.css" />
+  <link rel="stylesheet" href="../assets/css/components.css" />
+</head>
+<body data-module="agenda">
+  <div class="app-shell">
+    <div id="app-sidebar"></div>
+    <div id="app-header"></div>
+
+    <main class="app-main">
+      <div class="page-header">
+        <div>
+          <h1>Agenda</h1>
+          <p style="color:var(--muted)">Eventos e lembretes, opcionalmente vinculados a um cliente.</p>
+        </div>
+        <button class="btn btn-primary" id="botao-novo-evento">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 5v14M5 12h14"/></svg>
+          Novo evento
+        </button>
+      </div>
+
+      <div class="calendar-toolbar">
+        <button class="calendar-nav-btn" id="mes-anterior" aria-label="Mês anterior">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+        </button>
+        <button class="calendar-nav-btn" id="mes-seguinte" aria-label="Próximo mês">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+        </button>
+        <h2 id="titulo-mes"></h2>
+        <button class="btn btn-secondary" id="botao-hoje" style="margin-left:auto;">Hoje</button>
+      </div>
+
+      <div class="calendar-grid" id="grade-calendario"></div>
+    </main>
+  </div>
+
+  <div class="modal-backdrop" id="modal-backdrop" hidden>
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="modal-titulo">Novo evento</h3>
+        <button class="icon-btn" id="modal-fechar" aria-label="Fechar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <input type="hidden" id="campo-id" />
+
+      <div class="field">
+        <label for="campo-titulo">Título do evento *</label>
+        <input class="input" id="campo-titulo" placeholder="Ex: Reunião de alinhamento" />
+      </div>
+
+      <div style="display:flex; gap:10px;">
+        <div class="field" style="flex:1;">
+          <label for="campo-data">Data *</label>
+          <input class="input" type="date" id="campo-data" />
+        </div>
+        <div class="field" style="flex:1;">
+          <label for="campo-hora">Hora</label>
+          <input class="input" type="time" id="campo-hora" />
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="campo-cliente">Cliente (opcional)</label>
+        <select class="input" id="campo-cliente">
+          <option value="">Nenhum</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="campo-projeto">Projeto (opcional)</label>
+        <select class="input" id="campo-projeto">
+          <option value="">Nenhum</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="campo-descricao">Descrição</label>
+        <textarea class="input" id="campo-descricao" rows="3" placeholder="Detalhes do evento"></textarea>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="modal-excluir" style="margin-right:auto; color:var(--danger); display:none;">Excluir evento</button>
+        <button class="btn btn-secondary" id="modal-cancelar">Cancelar</button>
+        <button class="btn btn-primary" id="modal-salvar">Salvar evento</button>
+      </div>
+    </div>
+  </div>
+
+  <script>const CTF_RAIZ = "../";</script>
+
+  <script src="../assets/js/utils.js"></script>
+  <script src="../assets/js/events.js"></script>
+  <script src="../assets/js/config.js"></script>
+  <script src="../assets/js/auth.js"></script>
+  <script src="../assets/js/db.js"></script>
+  <script src="../assets/js/catalogo-menu.js"></script>
+  <script src="../assets/js/partials.js"></script>
+  <script src="../assets/js/app-shell.js" defer></script>
+
+  <script defer>
+    const DIAS_SEMANA = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+    const hoje = new Date();
+    let anoAtual = hoje.getFullYear();
+    let mesAtual = hoje.getMonth(); // 0-11
+    let dataSelecionadaModal = null;
+
+    function chaveDia(ano, mes, dia) {
+      const m = String(mes + 1).padStart(2, "0");
+      const d = String(dia).padStart(2, "0");
+      return `${ano}-${m}-${d}`;
+    }
+
+    function ehHoje(ano, mes, dia) {
+      return ano === hoje.getFullYear() && mes === hoje.getMonth() && dia === hoje.getDate();
+    }
+
+    function renderizarCalendario() {
+      document.getElementById("titulo-mes").textContent = `${MESES_PT[mesAtual]} de ${anoAtual}`;
+
+      const eventos = getAll("eventos");
+      const primeiroDiaSemana = new Date(anoAtual, mesAtual, 1).getDay(); // 0=domingo
+      const diasNoMes = new Date(anoAtual, mesAtual + 1, 0).getDate();
+      const diasNoMesAnterior = new Date(anoAtual, mesAtual, 0).getDate();
+
+      const celulas = [];
+
+      // dias do mês anterior (preenchimento)
+      for (let i = primeiroDiaSemana - 1; i >= 0; i--) {
+        celulas.push({ dia: diasNoMesAnterior - i, foraDoMes: true });
+      }
+      // dias do mês atual
+      for (let dia = 1; dia <= diasNoMes; dia++) {
+        celulas.push({ dia, foraDoMes: false });
+      }
+      // completar até múltiplo de 7
+      while (celulas.length % 7 !== 0) {
+        celulas.push({ dia: celulas.length - (primeiroDiaSemana + diasNoMes) + 1, foraDoMes: true });
+      }
+
+      const cabecalho = DIAS_SEMANA.map((d) => `<div class="calendar-weekday">${d}</div>`).join("");
+
+      const corpo = celulas
+        .map((celula) => {
+          const chave = celula.foraDoMes ? null : chaveDia(anoAtual, mesAtual, celula.dia);
+          const eventosDoDia = chave ? eventos.filter((e) => e.data === chave) : [];
+          const visiveis = eventosDoDia.slice(0, 3);
+          const restantes = eventosDoDia.length - visiveis.length;
+          const classeHoje = !celula.foraDoMes && ehHoje(anoAtual, mesAtual, celula.dia) ? " hoje" : "";
+
+          return `
+            <div class="calendar-day${celula.foraDoMes ? " fora-do-mes" : classeHoje}" data-dia="${celula.foraDoMes ? "" : celula.dia}">
+              <span class="calendar-day-numero">${celula.dia}</span>
+              ${visiveis.map((e) => `<div class="calendar-event-chip" data-evento="${e.id}" title="${e.titulo}">${e.hora ? e.hora + " " : ""}${e.titulo}</div>`).join("")}
+              ${restantes > 0 ? `<span class="calendar-event-mais">+${restantes} mais</span>` : ""}
+            </div>`;
+        })
+        .join("");
+
+      document.getElementById("grade-calendario").innerHTML = cabecalho + corpo;
+    }
+
+    function popularSelectClientes(clienteId) {
+      const select = document.getElementById("campo-cliente");
+      select.innerHTML =
+        '<option value="">Nenhum</option>' +
+        getAll("clientes")
+          .sort((a, b) => a.nome.localeCompare(b.nome))
+          .map((c) => `<option value="${c.id}" ${c.id === clienteId ? "selected" : ""}>${c.nome}</option>`)
+          .join("");
+    }
+
+    function popularSelectProjetos(projetoId) {
+      document.getElementById("campo-projeto").innerHTML =
+        '<option value="">Nenhum</option>' +
+        getAll("projetos")
+          .sort((a, b) => a.nome.localeCompare(b.nome))
+          .map((p) => `<option value="${p.id}" ${p.id === projetoId ? "selected" : ""}>${p.nome}</option>`)
+          .join("");
+    }
+
+    function abrirModalNovo(dataPreenchida) {
+      popularSelectClientes(null);
+      popularSelectProjetos(null);
+      document.getElementById("modal-titulo").textContent = "Novo evento";
+      document.getElementById("modal-excluir").style.display = "none";
+      document.getElementById("campo-id").value = "";
+      document.getElementById("campo-titulo").value = "";
+      document.getElementById("campo-data").value = dataPreenchida || chaveDia(anoAtual, mesAtual, hoje.getDate());
+      document.getElementById("campo-hora").value = "";
+      document.getElementById("campo-descricao").value = "";
+      document.getElementById("modal-backdrop").hidden = false;
+      document.getElementById("campo-titulo").focus();
+    }
+
+    function abrirModalEditar(id) {
+      const evento = getPorId("eventos", id);
+      popularSelectClientes(evento.clienteId);
+      popularSelectProjetos(evento.projetoId);
+      document.getElementById("modal-titulo").textContent = "Editar evento";
+      document.getElementById("modal-excluir").style.display = "inline-flex";
+      document.getElementById("campo-id").value = evento.id;
+      document.getElementById("campo-titulo").value = evento.titulo;
+      document.getElementById("campo-data").value = evento.data;
+      document.getElementById("campo-hora").value = evento.hora || "";
+      document.getElementById("campo-descricao").value = evento.descricao || "";
+      document.getElementById("modal-backdrop").hidden = false;
+      document.getElementById("campo-titulo").focus();
+    }
+
+    function fecharModal() {
+      document.getElementById("modal-backdrop").hidden = true;
+    }
+
+    function salvarEvento() {
+      const id = document.getElementById("campo-id").value;
+      const titulo = document.getElementById("campo-titulo").value.trim();
+      const data = document.getElementById("campo-data").value;
+      if (!titulo || !data) {
+        document.getElementById(!titulo ? "campo-titulo" : "campo-data").focus();
+        return;
+      }
+      const dados = {
+        titulo,
+        data,
+        hora: document.getElementById("campo-hora").value,
+        clienteId: document.getElementById("campo-cliente").value || null,
+        projetoId: document.getElementById("campo-projeto").value || null,
+        descricao: document.getElementById("campo-descricao").value.trim(),
+      };
+      if (id) atualizar("eventos", id, dados);
+      else inserir("eventos", dados);
+      fecharModal();
+      renderizarCalendario();
+    }
+
+    window.addEventListener("ctf:shell-pronto", () => {
+      renderizarCalendario();
+      onDadosMudarem("eventos", renderizarCalendario);
+      onDadosMudarem("clientes", renderizarCalendario);
+      onDadosMudarem("projetos", renderizarCalendario);
+    });
+
+    document.getElementById("mes-anterior").addEventListener("click", () => {
+      mesAtual--;
+      if (mesAtual < 0) { mesAtual = 11; anoAtual--; }
+      renderizarCalendario();
+    });
+    document.getElementById("mes-seguinte").addEventListener("click", () => {
+      mesAtual++;
+      if (mesAtual > 11) { mesAtual = 0; anoAtual++; }
+      renderizarCalendario();
+    });
+    document.getElementById("botao-hoje").addEventListener("click", () => {
+      anoAtual = hoje.getFullYear();
+      mesAtual = hoje.getMonth();
+      renderizarCalendario();
+    });
+
+    document.getElementById("botao-novo-evento").addEventListener("click", () => abrirModalNovo());
+    document.getElementById("modal-fechar").addEventListener("click", fecharModal);
+    document.getElementById("modal-cancelar").addEventListener("click", fecharModal);
+    document.getElementById("modal-backdrop").addEventListener("click", (e) => {
+      if (e.target.id === "modal-backdrop") fecharModal();
+    });
+    document.getElementById("modal-salvar").addEventListener("click", salvarEvento);
+    document.getElementById("modal-excluir").addEventListener("click", () => {
+      const id = document.getElementById("campo-id").value;
+      if (id && confirm("Excluir este evento?")) {
+        remover("eventos", id);
+        fecharModal();
+        renderizarCalendario();
+      }
+    });
+
+    document.getElementById("grade-calendario").addEventListener("click", (e) => {
+      const chip = e.target.closest("[data-evento]");
+      if (chip) return abrirModalEditar(chip.dataset.evento);
+
+      const celula = e.target.closest(".calendar-day:not(.fora-do-mes)");
+      if (celula) abrirModalNovo(chaveDia(anoAtual, mesAtual, Number(celula.dataset.dia)));
+    });
+  </script>
+</body>
+</html>

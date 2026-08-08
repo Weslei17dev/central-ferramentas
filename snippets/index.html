@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Central de Ferramentas — Snippets</title>
+
+  <script>
+    document.documentElement.dataset.theme = localStorage.getItem("ctf_tema") || "dark";
+  </script>
+
+  <link rel="stylesheet" href="../assets/css/tokens.css" />
+  <link rel="stylesheet" href="../assets/css/base.css" />
+  <link rel="stylesheet" href="../assets/css/components.css" />
+</head>
+<body data-module="snippets">
+  <div class="app-shell">
+    <div id="app-sidebar"></div>
+    <div id="app-header"></div>
+
+    <main class="app-main">
+      <div class="page-header">
+        <div>
+          <h1>Snippets</h1>
+          <p style="color:var(--muted)">Biblioteca pessoal de códigos reaproveitáveis.</p>
+        </div>
+        <button class="btn btn-primary" id="botao-novo-snippet">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 5v14M5 12h14"/></svg>
+          Novo snippet
+        </button>
+      </div>
+
+      <div style="margin-bottom:18px;">
+        <select class="input" id="filtro-linguagem" style="max-width:220px;">
+          <option value="">Todas as linguagens</option>
+        </select>
+      </div>
+
+      <div id="lista-snippets" class="grid-cards"></div>
+      <div id="estado-vazio" class="empty-state" hidden>
+        <h3>Nenhum snippet encontrado</h3>
+        <p>Cadastre o primeiro trecho de código.</p>
+      </div>
+    </main>
+  </div>
+
+  <div class="modal-backdrop" id="modal-backdrop" hidden>
+    <div class="modal modal--largo">
+      <div class="modal-header">
+        <h3 id="modal-titulo">Novo snippet</h3>
+        <button class="icon-btn" id="modal-fechar" aria-label="Fechar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <input type="hidden" id="campo-id" />
+
+      <div class="field">
+        <label for="campo-titulo-form">Título *</label>
+        <input class="input" id="campo-titulo-form" placeholder="Ex: Debounce em JavaScript" />
+      </div>
+
+      <div style="display:flex; gap:10px;">
+        <div class="field" style="flex:1;">
+          <label for="campo-linguagem">Linguagem</label>
+          <select class="input" id="campo-linguagem"></select>
+        </div>
+        <div class="field" style="flex:1;">
+          <label for="campo-tags">Tags</label>
+          <input class="input" id="campo-tags" placeholder="Separadas por vírgula" />
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="campo-codigo">Código *</label>
+        <textarea class="input code-editor" id="campo-codigo" placeholder="Cole ou escreva o código aqui"></textarea>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="modal-excluir" style="margin-right:auto; color:var(--danger); display:none;">Excluir</button>
+        <button class="btn btn-secondary" id="modal-cancelar">Cancelar</button>
+        <button class="btn btn-primary" id="modal-salvar">Salvar snippet</button>
+      </div>
+    </div>
+  </div>
+
+  <script>const CTF_RAIZ = "../";</script>
+
+  <script src="../assets/js/utils.js"></script>
+  <script src="../assets/js/events.js"></script>
+  <script src="../assets/js/config.js"></script>
+  <script src="../assets/js/auth.js"></script>
+  <script src="../assets/js/db.js"></script>
+  <script src="../assets/js/catalogo-menu.js"></script>
+  <script src="../assets/js/partials.js"></script>
+  <script src="../assets/js/app-shell.js" defer></script>
+
+  <script defer>
+    let filtroTexto = "";
+
+    function popularSelectsLinguagem(linguagemSelecionada) {
+      const linguagens = getCategorias("snippet");
+      document.getElementById("filtro-linguagem").innerHTML =
+        '<option value="">Todas as linguagens</option>' + linguagens.map((l) => `<option value="${l.nome}">${l.nome}</option>`).join("");
+      document.getElementById("campo-linguagem").innerHTML =
+        linguagens.map((l) => `<option value="${l.nome}" ${l.nome === linguagemSelecionada ? "selected" : ""}>${l.nome}</option>`).join("");
+    }
+
+    function ehFavorito(id) {
+      return getAll("favoritos").some((f) => f.tipo === "snippet" && f.refId === id);
+    }
+
+    function cardSnippet(snippet) {
+      const tags = (snippet.tags || []).map((t) => `<span class="badge badge--muted">${t}</span>`).join("");
+      return `
+        <div class="card">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
+            <div>
+              <strong style="color:var(--ink); font-size:14px;">${snippet.titulo}</strong>
+              <div><span class="badge badge--accent">${snippet.linguagem}</span></div>
+            </div>
+            <div style="display:flex; gap:2px;">
+              <button class="icon-btn favorito ${ehFavorito(snippet.id) ? "ativo" : ""}" data-acao="favoritar" data-id="${snippet.id}" title="Favoritar">
+                <svg viewBox="0 0 24 24" fill="${ehFavorito(snippet.id) ? "currentColor" : "none"}" stroke="currentColor" stroke-width="1.8"><path d="M12 2l2.9 6.3L21 9l-4.9 4.3L17.5 20 12 16.6 6.5 20l1.4-6.7L3 9l6.1-.7z"/></svg>
+              </button>
+              <button class="icon-btn" data-acao="editar" data-id="${snippet.id}" title="Editar">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
+              </button>
+              <button class="icon-btn excluir" data-acao="excluir" data-id="${snippet.id}" title="Excluir">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m2 0-1 14a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1L5 6"/></svg>
+              </button>
+            </div>
+          </div>
+
+          <div class="code-block" style="margin-top:10px;">${escaparHTML(snippet.codigo)}</div>
+
+          ${tags ? `<div class="arquivo-tags" style="margin-top:8px;">${tags}</div>` : ""}
+
+          <button class="btn btn-secondary" style="width:100%; margin-top:10px;" data-acao="copiar" data-id="${snippet.id}">
+            Copiar código
+          </button>
+        </div>`;
+    }
+
+    function renderizarSnippets() {
+      const filtroLinguagem = document.getElementById("filtro-linguagem").value;
+      const snippets = getAll("snippets")
+        .filter((s) => (s.titulo + " " + (s.tags || []).join(" ")).toLowerCase().includes(filtroTexto.toLowerCase()))
+        .filter((s) => !filtroLinguagem || s.linguagem === filtroLinguagem)
+        .sort((a, b) => a.titulo.localeCompare(b.titulo));
+
+      const lista = document.getElementById("lista-snippets");
+      const vazio = document.getElementById("estado-vazio");
+      lista.innerHTML = snippets.map(cardSnippet).join("");
+      vazio.hidden = snippets.length !== 0;
+    }
+
+    function abrirModal(snippet = null) {
+      popularSelectsLinguagem(snippet?.linguagem);
+      document.getElementById("modal-titulo").textContent = snippet ? "Editar snippet" : "Novo snippet";
+      document.getElementById("modal-excluir").style.display = snippet ? "inline-flex" : "none";
+      document.getElementById("campo-id").value = snippet?.id || "";
+      document.getElementById("campo-titulo-form").value = snippet?.titulo || "";
+      document.getElementById("campo-linguagem").value = snippet?.linguagem || "";
+      document.getElementById("campo-tags").value = (snippet?.tags || []).join(", ");
+      document.getElementById("campo-codigo").value = snippet?.codigo || "";
+      document.getElementById("modal-backdrop").hidden = false;
+      document.getElementById("campo-titulo-form").focus();
+    }
+    function fecharModal() { document.getElementById("modal-backdrop").hidden = true; }
+
+    function salvarSnippet() {
+      const id = document.getElementById("campo-id").value;
+      const titulo = document.getElementById("campo-titulo-form").value.trim();
+      const codigo = document.getElementById("campo-codigo").value;
+      if (!titulo || !codigo.trim()) {
+        document.getElementById(!titulo ? "campo-titulo-form" : "campo-codigo").focus();
+        return;
+      }
+      const dados = {
+        titulo,
+        linguagem: document.getElementById("campo-linguagem").value,
+        tags: document.getElementById("campo-tags").value.split(",").map((t) => t.trim()).filter(Boolean),
+        codigo,
+      };
+      if (id) atualizar("snippets", id, dados);
+      else inserir("snippets", dados);
+      fecharModal();
+      renderizarSnippets();
+    }
+
+    function excluirSnippet(id) {
+      const snippet = getPorId("snippets", id);
+      if (confirm(`Excluir o snippet "${snippet.titulo}"?`)) {
+        remover("snippets", id);
+        renderizarSnippets();
+      }
+    }
+
+    function copiarSnippet(id, botao) {
+      const snippet = getPorId("snippets", id);
+      navigator.clipboard.writeText(snippet.codigo).then(() => {
+        const textoOriginal = botao.textContent;
+        botao.textContent = "Copiado!";
+        setTimeout(() => { botao.textContent = textoOriginal; }, 1500);
+      });
+    }
+
+    window.addEventListener("ctf:shell-pronto", () => {
+      popularSelectsLinguagem();
+      renderizarSnippets();
+      document.getElementById("busca-global")?.addEventListener("input", (e) => {
+        filtroTexto = e.target.value;
+        renderizarSnippets();
+      });
+      document.getElementById("filtro-linguagem").addEventListener("change", renderizarSnippets);
+      onDadosMudarem("snippets", renderizarSnippets);
+      onDadosMudarem("favoritos", renderizarSnippets);
+      onDadosMudarem("categorias", () => popularSelectsLinguagem());
+    });
+
+    document.getElementById("botao-novo-snippet").addEventListener("click", () => abrirModal());
+    document.getElementById("modal-fechar").addEventListener("click", fecharModal);
+    document.getElementById("modal-cancelar").addEventListener("click", fecharModal);
+    document.getElementById("modal-backdrop").addEventListener("click", (e) => { if (e.target.id === "modal-backdrop") fecharModal(); });
+    document.getElementById("modal-salvar").addEventListener("click", salvarSnippet);
+    document.getElementById("modal-excluir").addEventListener("click", () => {
+      const id = document.getElementById("campo-id").value;
+      fecharModal();
+      if (id) excluirSnippet(id);
+    });
+
+    document.getElementById("lista-snippets").addEventListener("click", (e) => {
+      const botao = e.target.closest("[data-acao]");
+      if (!botao) return;
+      const id = botao.dataset.id;
+      if (botao.dataset.acao === "editar") abrirModal(getPorId("snippets", id));
+      if (botao.dataset.acao === "excluir") excluirSnippet(id);
+      if (botao.dataset.acao === "copiar") copiarSnippet(id, botao);
+      if (botao.dataset.acao === "favoritar") {
+        alternarFavorito("snippet", id);
+        renderizarSnippets();
+      }
+    });
+  </script>
+</body>
+</html>

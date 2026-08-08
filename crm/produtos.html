@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Central de Ferramentas — Produtos</title>
+
+  <script>
+    document.documentElement.dataset.theme = localStorage.getItem("ctf_tema") || "dark";
+  </script>
+
+  <link rel="stylesheet" href="../assets/css/tokens.css" />
+  <link rel="stylesheet" href="../assets/css/base.css" />
+  <link rel="stylesheet" href="../assets/css/components.css" />
+</head>
+<body data-module="crm-produtos">
+  <div class="app-shell">
+    <div id="app-sidebar"></div>
+    <div id="app-header"></div>
+
+    <main class="app-main">
+      <div class="page-header">
+        <div>
+          <h1>Produtos</h1>
+          <p style="color:var(--muted)">Catálogo usado para vincular oportunidades no Funil de Vendas.</p>
+        </div>
+        <button class="btn btn-primary" id="botao-novo-produto">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 5v14M5 12h14"/></svg>
+          Novo produto
+        </button>
+      </div>
+
+      <div id="lista-produtos" class="grid-cards"></div>
+      <div id="estado-vazio" class="empty-state" hidden>
+        <h3>Nenhum produto cadastrado</h3>
+        <p>Cadastre o primeiro produto para poder vinculá-lo a oportunidades.</p>
+      </div>
+    </main>
+  </div>
+
+  <div class="modal-backdrop" id="modal-backdrop" hidden>
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="modal-titulo">Novo produto</h3>
+        <button class="icon-btn" id="modal-fechar" aria-label="Fechar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <input type="hidden" id="campo-id" />
+
+      <div class="field">
+        <label for="campo-nome">Nome do produto *</label>
+        <input class="input" id="campo-nome" placeholder="Ex: Website Institucional" />
+      </div>
+
+      <div class="field">
+        <label for="campo-preco">Preço (R$) *</label>
+        <input class="input" type="number" min="0" step="0.01" id="campo-preco" placeholder="0,00" />
+      </div>
+
+      <div class="field">
+        <label for="campo-tipo">Tipo</label>
+        <select class="input" id="campo-tipo">
+          <option value="unico">Produto único</option>
+          <option value="recorrente">Recorrente / assinatura</option>
+        </select>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="modal-cancelar">Cancelar</button>
+        <button class="btn btn-primary" id="modal-salvar">Salvar produto</button>
+      </div>
+    </div>
+  </div>
+
+  <script>const CTF_RAIZ = "../";</script>
+
+  <script src="../assets/js/utils.js"></script>
+  <script src="../assets/js/events.js"></script>
+  <script src="../assets/js/config.js"></script>
+  <script src="../assets/js/auth.js"></script>
+  <script src="../assets/js/db.js"></script>
+  <script src="../assets/js/catalogo-menu.js"></script>
+  <script src="../assets/js/partials.js"></script>
+  <script src="../assets/js/app-shell.js" defer></script>
+
+  <script defer>
+    let filtroAtual = "";
+
+    function cardProduto(produto) {
+      return `
+        <div class="card card-hover">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
+            <strong style="color:var(--ink); font-size:14px;">${produto.nome}</strong>
+            <div style="display:flex; gap:2px;">
+              <button class="icon-btn" data-acao="editar" data-id="${produto.id}" title="Editar">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
+              </button>
+              <button class="icon-btn excluir" data-acao="excluir" data-id="${produto.id}" title="Excluir">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m2 0-1 14a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1L5 6"/></svg>
+              </button>
+            </div>
+          </div>
+          <p style="margin-top:8px; font-size:18px; font-weight:700; color:var(--accent);">${formatarMoeda(produto.preco)}</p>
+          <span class="badge ${produto.tipo === "recorrente" ? "badge--warning" : "badge--muted"}">
+            ${produto.tipo === "recorrente" ? "Recorrente" : "Produto único"}
+          </span>
+        </div>`;
+    }
+
+    function renderizarProdutos() {
+      const lista = document.getElementById("lista-produtos");
+      const vazio = document.getElementById("estado-vazio");
+      const produtos = getAll("produtos")
+        .filter((p) => p.nome.toLowerCase().includes(filtroAtual.toLowerCase()))
+        .sort((a, b) => a.nome.localeCompare(b.nome));
+
+      if (produtos.length === 0) {
+        lista.innerHTML = "";
+        vazio.hidden = false;
+        return;
+      }
+      vazio.hidden = true;
+      lista.innerHTML = produtos.map(cardProduto).join("");
+    }
+
+    function abrirModal(produto = null) {
+      document.getElementById("modal-titulo").textContent = produto ? "Editar produto" : "Novo produto";
+      document.getElementById("campo-id").value = produto?.id || "";
+      document.getElementById("campo-nome").value = produto?.nome || "";
+      document.getElementById("campo-preco").value = produto?.preco ?? "";
+      document.getElementById("campo-tipo").value = produto?.tipo || "unico";
+      document.getElementById("modal-backdrop").hidden = false;
+      document.getElementById("campo-nome").focus();
+    }
+
+    function fecharModal() {
+      document.getElementById("modal-backdrop").hidden = true;
+    }
+
+    function salvarProduto() {
+      const id = document.getElementById("campo-id").value;
+      const nome = document.getElementById("campo-nome").value.trim();
+      const preco = parseFloat(document.getElementById("campo-preco").value);
+      const tipo = document.getElementById("campo-tipo").value;
+      if (!nome || isNaN(preco)) {
+        document.getElementById(!nome ? "campo-nome" : "campo-preco").focus();
+        return;
+      }
+      if (id) atualizar("produtos", id, { nome, preco, tipo });
+      else inserir("produtos", { nome, preco, tipo });
+      fecharModal();
+      renderizarProdutos();
+    }
+
+    function excluirProduto(id) {
+      const produto = getPorId("produtos", id);
+      const usado = getAll("oportunidades").some((o) => o.produtoId === id);
+      if (usado) {
+        alert(`"${produto.nome}" não pode ser excluído: está vinculado a uma oportunidade no Funil de Vendas.`);
+        return;
+      }
+      if (confirm(`Excluir o produto "${produto.nome}"?`)) {
+        remover("produtos", id);
+        renderizarProdutos();
+      }
+    }
+
+    window.addEventListener("ctf:shell-pronto", () => {
+      renderizarProdutos();
+      document.getElementById("busca-global")?.addEventListener("input", (e) => {
+        filtroAtual = e.target.value;
+        renderizarProdutos();
+      });
+      onDadosMudarem("produtos", renderizarProdutos);
+    });
+
+    document.getElementById("botao-novo-produto").addEventListener("click", () => abrirModal());
+    document.getElementById("modal-fechar").addEventListener("click", fecharModal);
+    document.getElementById("modal-cancelar").addEventListener("click", fecharModal);
+    document.getElementById("modal-backdrop").addEventListener("click", (e) => {
+      if (e.target.id === "modal-backdrop") fecharModal();
+    });
+    document.getElementById("modal-salvar").addEventListener("click", salvarProduto);
+
+    document.getElementById("lista-produtos").addEventListener("click", (e) => {
+      const botao = e.target.closest("[data-acao]");
+      if (!botao) return;
+      const id = botao.dataset.id;
+      if (botao.dataset.acao === "editar") abrirModal(getPorId("produtos", id));
+      if (botao.dataset.acao === "excluir") excluirProduto(id);
+    });
+  </script>
+</body>
+</html>

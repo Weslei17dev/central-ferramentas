@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Central de Ferramentas — Histórico de Projetos</title>
+
+  <script>
+    document.documentElement.dataset.theme = localStorage.getItem("ctf_tema") || "dark";
+  </script>
+
+  <link rel="stylesheet" href="../assets/css/tokens.css" />
+  <link rel="stylesheet" href="../assets/css/base.css" />
+  <link rel="stylesheet" href="../assets/css/components.css" />
+</head>
+<body data-module="projetos">
+  <div class="app-shell">
+    <div id="app-sidebar"></div>
+    <div id="app-header"></div>
+
+    <main class="app-main">
+      <a href="index.html" class="btn btn-ghost" style="padding-left:0; margin-bottom:8px;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M15 18l-6-6 6-6"/></svg>
+        Voltar para Projetos
+      </a>
+
+      <div class="page-header">
+        <div>
+          <h1>Histórico de Ações</h1>
+          <p style="color:var(--muted)">Log de criação, edição e exclusão em Projetos.</p>
+        </div>
+        <button class="btn btn-secondary" id="botao-limpar" style="color:var(--danger);">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m2 0-1 14a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1L5 6"/></svg>
+          Limpar histórico
+        </button>
+      </div>
+
+      <div id="lista-logs"></div>
+      <div id="estado-vazio" class="empty-state" hidden>
+        <h3>Nenhuma ação registrada ainda</h3>
+        <p>Criar, editar ou mover algo em Projetos vai aparecer aqui.</p>
+      </div>
+    </main>
+  </div>
+
+  <script>const CTF_RAIZ = "../";</script>
+
+  <script src="../assets/js/utils.js"></script>
+  <script src="../assets/js/events.js"></script>
+  <script src="../assets/js/config.js"></script>
+  <script src="../assets/js/auth.js"></script>
+  <script src="../assets/js/db.js"></script>
+  <script src="../assets/js/catalogo-menu.js"></script>
+  <script src="../assets/js/partials.js"></script>
+  <script src="../assets/js/app-shell.js" defer></script>
+
+  <script defer>
+    function renderizarLogs() {
+      const logs = getAll("logs").filter((l) => l.modulo === "projetos");
+      const lista = document.getElementById("lista-logs");
+      const vazio = document.getElementById("estado-vazio");
+
+      if (logs.length === 0) {
+        lista.innerHTML = "";
+        vazio.hidden = false;
+        return;
+      }
+      vazio.hidden = true;
+      lista.innerHTML = logs.map((l) => `
+        <div class="card" style="margin-bottom:8px; padding:12px 16px;">
+          <div style="font-family:var(--font-mono); font-size:11px; color:var(--muted);">${new Date(l.data).toLocaleString("pt-BR")}</div>
+          <div style="font-size:13.5px; margin-top:2px;">${l.acao}</div>
+        </div>`).join("");
+    }
+
+    window.addEventListener("ctf:shell-pronto", () => {
+      renderizarLogs();
+      onDadosMudarem("logs", renderizarLogs);
+    });
+
+    document.getElementById("botao-limpar").addEventListener("click", () => {
+      if (!confirm("Apagar todo o histórico de ações de Projetos?")) return;
+      const outros = getAll("logs").filter((l) => l.modulo !== "projetos");
+      saveAll("logs", outros);
+      renderizarLogs();
+    });
+  </script>
+</body>
+</html>

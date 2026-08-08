@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Central de Ferramentas — Calendário de Projetos</title>
+
+  <script>
+    document.documentElement.dataset.theme = localStorage.getItem("ctf_tema") || "dark";
+  </script>
+
+  <link rel="stylesheet" href="../assets/css/tokens.css" />
+  <link rel="stylesheet" href="../assets/css/base.css" />
+  <link rel="stylesheet" href="../assets/css/components.css" />
+</head>
+<body data-module="projetos">
+  <div class="app-shell">
+    <div id="app-sidebar"></div>
+    <div id="app-header"></div>
+
+    <main class="app-main">
+      <a href="index.html" class="btn btn-ghost" style="padding-left:0; margin-bottom:8px;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M15 18l-6-6 6-6"/></svg>
+        Voltar para Projetos
+      </a>
+
+      <div class="page-header">
+        <div>
+          <h1>Calendário de Projetos</h1>
+          <p style="color:var(--muted)">Prazos de tarefas de todos os projetos, num só lugar.</p>
+        </div>
+      </div>
+
+      <div class="calendar-toolbar">
+        <button class="calendar-nav-btn" id="mes-anterior" aria-label="Mês anterior">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+        </button>
+        <button class="calendar-nav-btn" id="mes-seguinte" aria-label="Próximo mês">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+        </button>
+        <h2 id="titulo-mes"></h2>
+        <button class="btn btn-secondary" id="botao-hoje" style="margin-left:auto;">Hoje</button>
+      </div>
+
+      <div class="calendar-grid" id="grade-calendario"></div>
+    </main>
+  </div>
+
+  <script>const CTF_RAIZ = "../";</script>
+
+  <script src="../assets/js/utils.js"></script>
+  <script src="../assets/js/events.js"></script>
+  <script src="../assets/js/config.js"></script>
+  <script src="../assets/js/auth.js"></script>
+  <script src="../assets/js/db.js"></script>
+  <script src="../assets/js/catalogo-menu.js"></script>
+  <script src="../assets/js/partials.js"></script>
+  <script src="../assets/js/app-shell.js" defer></script>
+
+  <script defer>
+    const DIAS_SEMANA = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+    const hoje = new Date();
+    let anoAtual = hoje.getFullYear();
+    let mesAtual = hoje.getMonth();
+
+    function chaveDia(ano, mes, dia) {
+      const m = String(mes + 1).padStart(2, "0");
+      const d = String(dia).padStart(2, "0");
+      return `${ano}-${m}-${d}`;
+    }
+    function ehHoje(ano, mes, dia) {
+      return ano === hoje.getFullYear() && mes === hoje.getMonth() && dia === hoje.getDate();
+    }
+
+    function renderizarCalendario() {
+      document.getElementById("titulo-mes").textContent = `${MESES_PT[mesAtual]} de ${anoAtual}`;
+
+      const tarefas = getAll("tarefas").filter((t) => t.prazo);
+      const projetos = getAll("projetos");
+
+      const primeiroDiaSemana = new Date(anoAtual, mesAtual, 1).getDay();
+      const diasNoMes = new Date(anoAtual, mesAtual + 1, 0).getDate();
+      const diasNoMesAnterior = new Date(anoAtual, mesAtual, 0).getDate();
+      const celulas = [];
+      for (let i = primeiroDiaSemana - 1; i >= 0; i--) celulas.push({ dia: diasNoMesAnterior - i, foraDoMes: true });
+      for (let dia = 1; dia <= diasNoMes; dia++) celulas.push({ dia, foraDoMes: false });
+      while (celulas.length % 7 !== 0) celulas.push({ dia: celulas.length - (primeiroDiaSemana + diasNoMes) + 1, foraDoMes: true });
+
+      const cabecalho = DIAS_SEMANA.map((d) => `<div class="calendar-weekday">${d}</div>`).join("");
+
+      const corpo = celulas.map((celula) => {
+        const chave = celula.foraDoMes ? null : chaveDia(anoAtual, mesAtual, celula.dia);
+        const tarefasDoDia = chave ? tarefas.filter((t) => t.prazo === chave) : [];
+        const visiveis = tarefasDoDia.slice(0, 3);
+        const restantes = tarefasDoDia.length - visiveis.length;
+        const classeHoje = !celula.foraDoMes && ehHoje(anoAtual, mesAtual, celula.dia) ? " hoje" : "";
+
+        return `
+          <div class="calendar-day${celula.foraDoMes ? " fora-do-mes" : classeHoje}">
+            <span class="calendar-day-numero">${celula.dia}</span>
+            ${visiveis.map((t) => {
+              const projeto = projetos.find((p) => p.id === t.projetoId);
+              return `<div class="calendar-event-chip" data-projeto="${t.projetoId}" title="${t.titulo} — ${projeto?.nome || ""}">${t.codigo ? t.codigo + " " : ""}${t.titulo}</div>`;
+            }).join("")}
+            ${restantes > 0 ? `<span class="calendar-event-mais">+${restantes} mais</span>` : ""}
+          </div>`;
+      }).join("");
+
+      document.getElementById("grade-calendario").innerHTML = cabecalho + corpo;
+    }
+
+    window.addEventListener("ctf:shell-pronto", () => {
+      renderizarCalendario();
+      onDadosMudarem("tarefas", renderizarCalendario);
+      onDadosMudarem("projetos", renderizarCalendario);
+    });
+
+    document.getElementById("mes-anterior").addEventListener("click", () => {
+      mesAtual--; if (mesAtual < 0) { mesAtual = 11; anoAtual--; }
+      renderizarCalendario();
+    });
+    document.getElementById("mes-seguinte").addEventListener("click", () => {
+      mesAtual++; if (mesAtual > 11) { mesAtual = 0; anoAtual++; }
+      renderizarCalendario();
+    });
+    document.getElementById("botao-hoje").addEventListener("click", () => {
+      anoAtual = hoje.getFullYear(); mesAtual = hoje.getMonth();
+      renderizarCalendario();
+    });
+
+    document.getElementById("grade-calendario").addEventListener("click", (e) => {
+      const chip = e.target.closest("[data-projeto]");
+      if (chip) window.location.href = `kanban.html?projeto=${chip.dataset.projeto}`;
+    });
+  </script>
+</body>
+</html>

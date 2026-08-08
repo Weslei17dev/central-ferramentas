@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Central de Ferramentas — Lista de Tarefas</title>
+
+  <script>
+    document.documentElement.dataset.theme = localStorage.getItem("ctf_tema") || "dark";
+  </script>
+
+  <link rel="stylesheet" href="../assets/css/tokens.css" />
+  <link rel="stylesheet" href="../assets/css/base.css" />
+  <link rel="stylesheet" href="../assets/css/components.css" />
+</head>
+<body data-module="projetos">
+  <div class="app-shell">
+    <div id="app-sidebar"></div>
+    <div id="app-header"></div>
+
+    <main class="app-main">
+      <a href="index.html" class="btn btn-ghost" style="padding-left:0; margin-bottom:8px;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M15 18l-6-6 6-6"/></svg>
+        Voltar para Projetos
+      </a>
+
+      <div class="page-header">
+        <div>
+          <h1 id="titulo-projeto">Carregando…</h1>
+          <div id="cliente-do-projeto" class="client-tag"></div>
+        </div>
+      </div>
+
+      <div style="display:flex; gap:8px; margin-bottom:18px;">
+        <a class="btn btn-secondary" id="tab-kanban">Kanban</a>
+        <a class="btn btn-primary" href="#" style="pointer-events:none;">Lista</a>
+      </div>
+
+      <div class="controls-row" style="display:flex; gap:10px; margin-bottom:18px;">
+        <input class="input" id="busca-local" placeholder="Pesquisar por título ou código..." style="flex:1;" />
+        <select class="input" id="filtro-prioridade" style="max-width:180px;">
+          <option value="">Todas as prioridades</option>
+          <option value="baixa">Baixa</option>
+          <option value="media">Média</option>
+          <option value="alta">Alta</option>
+        </select>
+      </div>
+
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr><th>Código</th><th>Título</th><th>Status</th><th>Prioridade</th><th>Responsável</th><th>Prazo</th></tr>
+          </thead>
+          <tbody id="lista-tarefas"></tbody>
+        </table>
+      </div>
+      <div id="estado-vazio" class="empty-state" hidden>
+        <h3>Nenhuma tarefa encontrada</h3>
+      </div>
+    </main>
+  </div>
+
+  <script>const CTF_RAIZ = "../";</script>
+
+  <script src="../assets/js/utils.js"></script>
+  <script src="../assets/js/events.js"></script>
+  <script src="../assets/js/config.js"></script>
+  <script src="../assets/js/auth.js"></script>
+  <script src="../assets/js/db.js"></script>
+  <script src="../assets/js/catalogo-menu.js"></script>
+  <script src="../assets/js/partials.js"></script>
+  <script src="../assets/js/app-shell.js" defer></script>
+
+  <script defer>
+    const projetoId = new URLSearchParams(window.location.search).get("projeto");
+    let filtroTexto = "";
+
+    function badgePrioridade(p) {
+      const mapa = { alta: "badge--accent", media: "badge--warning", baixa: "badge--muted" };
+      const label = { alta: "Alta", media: "Média", baixa: "Baixa" };
+      return `<span class="badge ${mapa[p] || "badge--muted"}">${label[p] || p}</span>`;
+    }
+
+    function linhaTarefa(tarefa) {
+      const coluna = getAll("kanbanColunas").find((c) => c.id === tarefa.coluna);
+      const responsavel = tarefa.responsavelId ? getPorId("equipe", tarefa.responsavelId) : null;
+      const ultimaColuna = getAll("kanbanColunas").slice(-1)[0];
+      const atrasada = tarefa.prazo && new Date(tarefa.prazo) < new Date() && tarefa.coluna !== ultimaColuna?.id;
+
+      return `
+        <tr>
+          <td style="font-family:var(--font-mono); color:var(--muted);">${tarefa.codigo || ""}</td>
+          <td>${tarefa.titulo}</td>
+          <td><span class="badge badge--muted">${coluna?.label || tarefa.coluna}</span></td>
+          <td>${badgePrioridade(tarefa.prioridade)}</td>
+          <td>${responsavel ? `<div style="display:flex; align-items:center; gap:6px;"><div class="avatar" style="width:22px;height:22px;font-size:10px;">${iniciais(responsavel.nome)}</div>${responsavel.nome}</div>` : "—"}</td>
+          <td style="${atrasada ? "color:var(--danger); font-weight:600;" : "color:var(--muted);"}">${tarefa.prazo ? formatarData(tarefa.prazo) : "—"}</td>
+        </tr>`;
+    }
+
+    function renderizarLista() {
+      const projeto = getPorId("projetos", projetoId);
+      if (!projeto) return;
+      const cliente = getPorId("clientes", projeto.clienteId);
+      const cor = cliente?.cor || "var(--muted)";
+      document.getElementById("titulo-projeto").textContent = projeto.nome;
+      document.getElementById("cliente-do-projeto").innerHTML = `<span class="client-dot" style="background:${cor}"></span> ${cliente?.nome || "Cliente removido"}`;
+      document.getElementById("tab-kanban").href = `kanban.html?projeto=${projetoId}`;
+
+      const filtroPrioridade = document.getElementById("filtro-prioridade").value;
+      const tarefas = getAll("tarefas")
+        .filter((t) => t.projetoId === projetoId)
+        .filter((t) => (t.titulo + " " + (t.codigo || "")).toLowerCase().includes(filtroTexto.toLowerCase()))
+        .filter((t) => !filtroPrioridade || t.prioridade === filtroPrioridade)
+        .sort((a, b) => (a.codigo || "").localeCompare(b.codigo || "", undefined, { numeric: true }));
+
+      const corpo = document.getElementById("lista-tarefas");
+      const vazio = document.getElementById("estado-vazio");
+      corpo.innerHTML = tarefas.map(linhaTarefa).join("");
+      vazio.hidden = tarefas.length !== 0;
+    }
+
+    window.addEventListener("ctf:shell-pronto", () => {
+      renderizarLista();
+      document.getElementById("busca-local").addEventListener("input", (e) => { filtroTexto = e.target.value; renderizarLista(); });
+      document.getElementById("filtro-prioridade").addEventListener("change", renderizarLista);
+      onDadosMudarem("tarefas", renderizarLista);
+      onDadosMudarem("equipe", renderizarLista);
+    });
+  </script>
+</body>
+</html>

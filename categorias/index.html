@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Central de Ferramentas — Categorias</title>
+
+  <script>
+    document.documentElement.dataset.theme = localStorage.getItem("ctf_tema") || "dark";
+  </script>
+
+  <link rel="stylesheet" href="../assets/css/tokens.css" />
+  <link rel="stylesheet" href="../assets/css/base.css" />
+  <link rel="stylesheet" href="../assets/css/components.css" />
+</head>
+<body data-module="categorias">
+  <div class="app-shell">
+    <div id="app-sidebar"></div>
+    <div id="app-header"></div>
+
+    <main class="app-main">
+      <div class="page-header">
+        <div>
+          <h1>Categorias</h1>
+          <p style="color:var(--muted)">Listas usadas como categoria em outros módulos — cadastre, edite ou remova aqui, sem depender de opções fixas.</p>
+        </div>
+      </div>
+
+      <div id="secoes-grupos"></div>
+    </main>
+  </div>
+
+  <script>const CTF_RAIZ = "../";</script>
+
+  <script src="../assets/js/utils.js"></script>
+  <script src="../assets/js/events.js"></script>
+  <script src="../assets/js/config.js"></script>
+  <script src="../assets/js/auth.js"></script>
+  <script src="../assets/js/db.js"></script>
+  <script src="../assets/js/catalogo-menu.js"></script>
+  <script src="../assets/js/partials.js"></script>
+  <script src="../assets/js/app-shell.js" defer></script>
+
+  <script defer>
+    const GRUPOS = [
+      { id: "artigo", label: "Categorias de Artigos", descricao: "Usadas na Base de Conhecimento" },
+      { id: "snippet", label: "Linguagens de Snippets", descricao: "Usadas no módulo Snippets" },
+      { id: "prompt", label: "Categorias de Prompts", descricao: "Usadas no módulo Prompts" },
+    ];
+
+    function usoEmUso(grupo, nome) {
+      if (grupo === "artigo") return getAll("artigos").some((a) => a.categoria === nome);
+      if (grupo === "snippet") return getAll("snippets").some((s) => s.linguagem === nome);
+      if (grupo === "prompt") return getAll("prompts").some((p) => p.categoria === nome);
+      return false;
+    }
+
+    function renderizarGrupos() {
+      const categorias = getAll("categorias");
+      document.getElementById("secoes-grupos").innerHTML = GRUPOS.map((grupo) => {
+        const itens = categorias.filter((c) => c.grupo === grupo.id).sort((a, b) => a.nome.localeCompare(b.nome));
+        return `
+          <div class="card" style="margin-bottom:18px;">
+            <h3 style="margin-bottom:2px;">${grupo.label}</h3>
+            <p style="font-size:12px; color:var(--muted); margin-bottom:14px;">${grupo.descricao}</p>
+            <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px;" data-lista="${grupo.id}">
+              ${itens.map((c) => `
+                <span class="badge badge--muted" style="display:inline-flex; align-items:center; gap:6px; padding:6px 10px;">
+                  ${c.nome}
+                  <button data-remover="${c.id}" data-grupo="${grupo.id}" data-nome="${c.nome}" style="border:none; background:none; color:var(--muted); cursor:pointer; display:flex;" title="Remover">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                  </button>
+                </span>`).join("") || '<span style="font-size:13px; color:var(--muted);">Nenhuma categoria cadastrada.</span>'}
+            </div>
+            <div style="display:flex; gap:6px;">
+              <input class="input" placeholder="Nova categoria..." data-input-novo="${grupo.id}" style="max-width:260px;" />
+              <button class="btn btn-secondary" data-adicionar="${grupo.id}">Adicionar</button>
+            </div>
+          </div>`;
+      }).join("");
+    }
+
+    function adicionarCategoria(grupo) {
+      const input = document.querySelector(`[data-input-novo="${grupo}"]`);
+      const nome = input.value.trim();
+      if (!nome) return;
+      if (getCategorias(grupo).some((c) => c.nome.toLowerCase() === nome.toLowerCase())) { input.value = ""; return; }
+      inserir("categorias", { grupo, nome });
+      input.value = "";
+      renderizarGrupos();
+    }
+
+    function removerCategoria(id, grupo, nome) {
+      if (usoEmUso(grupo, nome)) {
+        alert(`"${nome}" não pode ser removida: ainda está sendo usada por algum item.`);
+        return;
+      }
+      remover("categorias", id);
+      renderizarGrupos();
+    }
+
+    window.addEventListener("ctf:shell-pronto", () => {
+      renderizarGrupos();
+      onDadosMudarem("categorias", renderizarGrupos);
+    });
+
+    document.getElementById("secoes-grupos").addEventListener("click", (e) => {
+      const adicionar = e.target.closest("[data-adicionar]");
+      if (adicionar) return adicionarCategoria(adicionar.dataset.adicionar);
+      const remover = e.target.closest("[data-remover]");
+      if (remover) return removerCategoria(remover.dataset.remover, remover.dataset.grupo, remover.dataset.nome);
+    });
+    document.getElementById("secoes-grupos").addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && e.target.dataset.inputNovo) {
+        e.preventDefault();
+        adicionarCategoria(e.target.dataset.inputNovo);
+      }
+    });
+  </script>
+</body>
+</html>

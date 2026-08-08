@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Central de Ferramentas — Estoque</title>
+
+  <script>
+    document.documentElement.dataset.theme = localStorage.getItem("ctf_tema") || "dark";
+  </script>
+
+  <link rel="stylesheet" href="../assets/css/tokens.css" />
+  <link rel="stylesheet" href="../assets/css/base.css" />
+  <link rel="stylesheet" href="../assets/css/components.css" />
+</head>
+<body data-module="estoque">
+  <div class="app-shell">
+    <div id="app-sidebar"></div>
+    <div id="app-header"></div>
+
+    <main class="app-main">
+      <div class="page-header">
+        <div>
+          <h1>Estoque</h1>
+          <p style="color:var(--muted)">Itens físicos, estoque mínimo e movimentações.</p>
+        </div>
+        <button class="btn btn-primary" id="botao-novo-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 5v14M5 12h14"/></svg>
+          Novo item
+        </button>
+      </div>
+
+      <div class="grid-resumo">
+        <div class="card">
+          <div class="card-resumo-label">Itens cadastrados</div>
+          <div class="card-resumo-valor" id="resumo-total">0</div>
+        </div>
+        <div class="card">
+          <div class="card-resumo-label">Abaixo do estoque mínimo</div>
+          <div class="card-resumo-valor" style="color:var(--accent)" id="resumo-baixo">0</div>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Código</th><th>Nome</th><th>Categoria</th>
+              <th>Quantidade</th><th>Mínimo</th><th>Status</th><th></th>
+            </tr>
+          </thead>
+          <tbody id="lista-itens"></tbody>
+        </table>
+      </div>
+      <div id="estado-vazio" class="empty-state" hidden>
+        <h3>Nenhum item cadastrado</h3>
+        <p>Cadastre o primeiro item do estoque.</p>
+      </div>
+    </main>
+  </div>
+
+  <!-- Modal: novo item / editar item -->
+  <div class="modal-backdrop" id="modal-backdrop-item" hidden>
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="modal-item-titulo">Novo item</h3>
+        <button class="icon-btn" data-fechar-item aria-label="Fechar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <input type="hidden" id="campo-id" />
+
+      <div class="field">
+        <label for="campo-nome">Nome do item *</label>
+        <input class="input" id="campo-nome" placeholder="Ex: Cabo HDMI 2m" />
+      </div>
+
+      <div style="display:flex; gap:10px;">
+        <div class="field" style="flex:1;">
+          <label for="campo-codigo">Código / SKU</label>
+          <input class="input" id="campo-codigo" placeholder="Ex: HDM-002" />
+        </div>
+        <div class="field" style="flex:1;">
+          <label for="campo-categoria">Categoria</label>
+          <input class="input" id="campo-categoria" placeholder="Ex: Acessórios" />
+        </div>
+      </div>
+
+      <div style="display:flex; gap:10px;">
+        <div class="field" style="flex:1;">
+          <label for="campo-quantidade">Quantidade atual *</label>
+          <input class="input" type="number" min="0" id="campo-quantidade" />
+        </div>
+        <div class="field" style="flex:1;">
+          <label for="campo-minimo">Estoque mínimo *</label>
+          <input class="input" type="number" min="0" id="campo-minimo" />
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="item-excluir" style="margin-right:auto; color:var(--danger); display:none;">Excluir item</button>
+        <button class="btn btn-secondary" data-fechar-item>Cancelar</button>
+        <button class="btn btn-primary" id="item-salvar">Salvar item</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: movimentar (entrada/saída) -->
+  <div class="modal-backdrop" id="modal-backdrop-mov" hidden>
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Movimentar estoque</h3>
+        <button class="icon-btn" data-fechar-mov aria-label="Fechar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <p id="mov-item-nome" style="color:var(--muted); margin-bottom:14px;"></p>
+      <input type="hidden" id="mov-item-id" />
+
+      <div class="field">
+        <label for="mov-tipo">Tipo *</label>
+        <select class="input" id="mov-tipo">
+          <option value="entrada">Entrada</option>
+          <option value="saida">Saída</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="mov-quantidade">Quantidade *</label>
+        <input class="input" type="number" min="1" id="mov-quantidade" value="1" />
+      </div>
+      <div class="field">
+        <label for="mov-motivo">Motivo (opcional)</label>
+        <input class="input" id="mov-motivo" placeholder="Ex: Reposição de fornecedor" />
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-fechar-mov>Cancelar</button>
+        <button class="btn btn-primary" id="mov-salvar">Confirmar movimentação</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: histórico -->
+  <div class="modal-backdrop" id="modal-backdrop-historico" hidden>
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Histórico de movimentações</h3>
+        <button class="icon-btn" data-fechar-historico aria-label="Fechar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div id="lista-historico"></div>
+    </div>
+  </div>
+
+  <script>const CTF_RAIZ = "../";</script>
+
+  <script src="../assets/js/utils.js"></script>
+  <script src="../assets/js/events.js"></script>
+  <script src="../assets/js/config.js"></script>
+  <script src="../assets/js/auth.js"></script>
+  <script src="../assets/js/db.js"></script>
+  <script src="../assets/js/catalogo-menu.js"></script>
+  <script src="../assets/js/partials.js"></script>
+  <script src="../assets/js/app-shell.js" defer></script>
+
+  <script defer>
+    function linhaItem(item) {
+      const baixo = Number(item.quantidade) < Number(item.estoqueMinimo);
+      return `
+        <tr>
+          <td style="font-family:var(--font-mono); color:var(--muted);">${item.codigo || "—"}</td>
+          <td>${item.nome}</td>
+          <td>${item.categoria || "—"}</td>
+          <td>${item.quantidade}</td>
+          <td>${item.estoqueMinimo}</td>
+          <td><span class="badge ${baixo ? "badge--accent" : "badge--success"}">${baixo ? "Estoque baixo" : "OK"}</span></td>
+          <td style="text-align:right; white-space:nowrap;">
+            <button class="icon-btn" data-movimentar="${item.id}" title="Movimentar (entrada/saída)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M7 16V4M7 4 3 8M7 4l4 4M17 8v12M17 20l4-4M17 20l-4-4"/></svg>
+            </button>
+            <button class="icon-btn" data-historico="${item.id}" title="Histórico">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5M12 7v5l4 2"/></svg>
+            </button>
+            <button class="icon-btn" data-editar="${item.id}" title="Editar">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
+            </button>
+            <button class="icon-btn excluir" data-excluir="${item.id}" title="Excluir">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m2 0-1 14a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1L5 6"/></svg>
+            </button>
+          </td>
+        </tr>`;
+    }
+
+    function renderizarItens() {
+      const itens = getAll("itensEstoque").sort((a, b) => a.nome.localeCompare(b.nome));
+      const corpo = document.getElementById("lista-itens");
+      const vazio = document.getElementById("estado-vazio");
+
+      corpo.innerHTML = itens.map(linhaItem).join("");
+      vazio.hidden = itens.length !== 0;
+
+      document.getElementById("resumo-total").textContent = itens.length;
+      document.getElementById("resumo-baixo").textContent = itens.filter((i) => Number(i.quantidade) < Number(i.estoqueMinimo)).length;
+    }
+
+    /* ---------- Modal de item ---------- */
+    function abrirModalItem(item = null) {
+      document.getElementById("modal-item-titulo").textContent = item ? "Editar item" : "Novo item";
+      document.getElementById("item-excluir").style.display = item ? "inline-flex" : "none";
+      document.getElementById("campo-id").value = item?.id || "";
+      document.getElementById("campo-nome").value = item?.nome || "";
+      document.getElementById("campo-codigo").value = item?.codigo || "";
+      document.getElementById("campo-categoria").value = item?.categoria || "";
+      document.getElementById("campo-quantidade").value = item?.quantidade ?? 0;
+      document.getElementById("campo-minimo").value = item?.estoqueMinimo ?? 0;
+      document.getElementById("modal-backdrop-item").hidden = false;
+      document.getElementById("campo-nome").focus();
+    }
+    function fecharModalItem() { document.getElementById("modal-backdrop-item").hidden = true; }
+
+    function salvarItem() {
+      const id = document.getElementById("campo-id").value;
+      const nome = document.getElementById("campo-nome").value.trim();
+      const quantidade = parseInt(document.getElementById("campo-quantidade").value, 10);
+      const estoqueMinimo = parseInt(document.getElementById("campo-minimo").value, 10);
+      if (!nome || isNaN(quantidade) || isNaN(estoqueMinimo)) {
+        document.getElementById("campo-nome").focus();
+        return;
+      }
+      const dados = {
+        nome,
+        codigo: document.getElementById("campo-codigo").value.trim(),
+        categoria: document.getElementById("campo-categoria").value.trim(),
+        quantidade,
+        estoqueMinimo,
+      };
+      if (id) atualizar("itensEstoque", id, dados);
+      else inserir("itensEstoque", dados);
+      fecharModalItem();
+      renderizarItens();
+    }
+
+    function excluirItem(id) {
+      const item = getPorId("itensEstoque", id);
+      if (confirm(`Excluir "${item.nome}"? O histórico de movimentações dele também será apagado.`)) {
+        getAll("movimentosEstoque").filter((m) => m.itemId === id).forEach((m) => remover("movimentosEstoque", m.id));
+        remover("itensEstoque", id);
+        renderizarItens();
+      }
+    }
+
+    /* ---------- Modal de movimentação ---------- */
+    function abrirModalMovimentar(itemId) {
+      const item = getPorId("itensEstoque", itemId);
+      document.getElementById("mov-item-id").value = itemId;
+      document.getElementById("mov-item-nome").textContent = `${item.nome} — quantidade atual: ${item.quantidade}`;
+      document.getElementById("mov-tipo").value = "entrada";
+      document.getElementById("mov-quantidade").value = 1;
+      document.getElementById("mov-motivo").value = "";
+      document.getElementById("modal-backdrop-mov").hidden = false;
+    }
+    function fecharModalMov() { document.getElementById("modal-backdrop-mov").hidden = true; }
+
+    function confirmarMovimentacao() {
+      const itemId = document.getElementById("mov-item-id").value;
+      const tipo = document.getElementById("mov-tipo").value;
+      const quantidade = parseInt(document.getElementById("mov-quantidade").value, 10);
+      if (!quantidade || quantidade <= 0) {
+        document.getElementById("mov-quantidade").focus();
+        return;
+      }
+      const item = getPorId("itensEstoque", itemId);
+      const novaQuantidade = tipo === "entrada" ? item.quantidade + quantidade : Math.max(0, item.quantidade - quantidade);
+      atualizar("itensEstoque", itemId, { quantidade: novaQuantidade });
+      inserir("movimentosEstoque", {
+        itemId,
+        tipo,
+        quantidade,
+        motivo: document.getElementById("mov-motivo").value.trim(),
+        data: new Date().toISOString(),
+      });
+      fecharModalMov();
+      renderizarItens();
+    }
+
+    /* ---------- Modal de histórico ---------- */
+    function abrirHistorico(itemId) {
+      const item = getPorId("itensEstoque", itemId);
+      const movimentos = getAll("movimentosEstoque")
+        .filter((m) => m.itemId === itemId)
+        .sort((a, b) => b.data.localeCompare(a.data));
+
+      document.querySelector("#modal-backdrop-historico h3").textContent = `Histórico — ${item.nome}`;
+      const lista = document.getElementById("lista-historico");
+      lista.innerHTML = movimentos.length
+        ? movimentos.map((m) => `
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--border);">
+              <div>
+                <span class="badge ${m.tipo === "entrada" ? "badge--success" : "badge--accent"}">${m.tipo === "entrada" ? "Entrada" : "Saída"}</span>
+                <span style="margin-left:8px; font-size:13px;">${m.motivo || "Sem motivo informado"}</span>
+              </div>
+              <div style="text-align:right;">
+                <div style="font-weight:600;">${m.tipo === "entrada" ? "+" : "−"} ${m.quantidade}</div>
+                <div style="font-size:11px; color:var(--muted);">${formatarData(m.data)}</div>
+              </div>
+            </div>`).join("")
+        : '<p style="color:var(--muted);">Nenhuma movimentação registrada ainda.</p>';
+
+      document.getElementById("modal-backdrop-historico").hidden = false;
+    }
+    function fecharHistorico() { document.getElementById("modal-backdrop-historico").hidden = true; }
+
+    window.addEventListener("ctf:shell-pronto", () => {
+      renderizarItens();
+      onDadosMudarem("itensEstoque", renderizarItens);
+    });
+
+    document.getElementById("botao-novo-item").addEventListener("click", () => abrirModalItem());
+    document.querySelectorAll("[data-fechar-item]").forEach((el) => el.addEventListener("click", fecharModalItem));
+    document.getElementById("modal-backdrop-item").addEventListener("click", (e) => { if (e.target.id === "modal-backdrop-item") fecharModalItem(); });
+    document.getElementById("item-salvar").addEventListener("click", salvarItem);
+    document.getElementById("item-excluir").addEventListener("click", () => excluirItem(document.getElementById("campo-id").value));
+
+    document.querySelectorAll("[data-fechar-mov]").forEach((el) => el.addEventListener("click", fecharModalMov));
+    document.getElementById("modal-backdrop-mov").addEventListener("click", (e) => { if (e.target.id === "modal-backdrop-mov") fecharModalMov(); });
+    document.getElementById("mov-salvar").addEventListener("click", confirmarMovimentacao);
+
+    document.querySelectorAll("[data-fechar-historico]").forEach((el) => el.addEventListener("click", fecharHistorico));
+    document.getElementById("modal-backdrop-historico").addEventListener("click", (e) => { if (e.target.id === "modal-backdrop-historico") fecharHistorico(); });
+
+    document.getElementById("lista-itens").addEventListener("click", (e) => {
+      const editar = e.target.closest("[data-editar]");
+      if (editar) return abrirModalItem(getPorId("itensEstoque", editar.dataset.editar));
+      const excluir = e.target.closest("[data-excluir]");
+      if (excluir) return excluirItem(excluir.dataset.excluir);
+      const mover = e.target.closest("[data-movimentar]");
+      if (mover) return abrirModalMovimentar(mover.dataset.movimentar);
+      const historico = e.target.closest("[data-historico]");
+      if (historico) return abrirHistorico(historico.dataset.historico);
+    });
+  </script>
+</body>
+</html>

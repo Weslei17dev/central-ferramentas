@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Central de Ferramentas — Base de Conhecimento</title>
+
+  <script>
+    document.documentElement.dataset.theme = localStorage.getItem("ctf_tema") || "dark";
+  </script>
+
+  <link rel="stylesheet" href="../assets/css/tokens.css" />
+  <link rel="stylesheet" href="../assets/css/base.css" />
+  <link rel="stylesheet" href="../assets/css/components.css" />
+</head>
+<body data-module="conhecimento">
+  <div class="app-shell">
+    <div id="app-sidebar"></div>
+    <div id="app-header"></div>
+
+    <main class="app-main">
+      <div class="page-header">
+        <div>
+          <h1>Base de Conhecimento</h1>
+          <p style="color:var(--muted)">Artigos, tutoriais, links e anotações.</p>
+        </div>
+        <button class="btn btn-primary" id="botao-novo-artigo">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 5v14M5 12h14"/></svg>
+          Novo artigo
+        </button>
+      </div>
+
+      <div style="margin-bottom:18px;">
+        <select class="input" id="filtro-categoria" style="max-width:220px;">
+          <option value="">Todas as categorias</option>
+        </select>
+      </div>
+
+      <div id="lista-artigos" class="grid-cards"></div>
+      <div id="estado-vazio" class="empty-state" hidden>
+        <h3>Nenhum artigo encontrado</h3>
+        <p>Crie o primeiro artigo, tutorial ou anotação.</p>
+      </div>
+    </main>
+  </div>
+
+  <!-- Modal: criar/editar artigo -->
+  <div class="modal-backdrop" id="modal-backdrop-editar" hidden>
+    <div class="modal modal--largo">
+      <div class="modal-header">
+        <h3 id="modal-titulo">Novo artigo</h3>
+        <button class="icon-btn" data-fechar-editar aria-label="Fechar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <input type="hidden" id="campo-id" />
+
+      <div class="field">
+        <label for="campo-titulo-form">Título *</label>
+        <input class="input" id="campo-titulo-form" placeholder="Ex: Como configurar o ambiente de deploy" />
+      </div>
+
+      <div style="display:flex; gap:10px;">
+        <div class="field" style="flex:1;">
+          <label for="campo-categoria">Categoria</label>
+          <select class="input" id="campo-categoria"></select>
+        </div>
+        <div class="field" style="flex:1;">
+          <label for="campo-tags">Tags</label>
+          <input class="input" id="campo-tags" placeholder="Separadas por vírgula" />
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="campo-link">Link (opcional)</label>
+        <input class="input" id="campo-link" placeholder="https://..." />
+      </div>
+
+      <div class="field">
+        <label for="campo-conteudo">Conteúdo</label>
+        <textarea class="input code-editor" id="campo-conteudo" placeholder="# Título&#10;## Subtítulo&#10;- item de lista&#10;**negrito** e *itálico*"></textarea>
+        <span style="font-size:11px; color:var(--muted); margin-top:4px;">Suporta # título, ## subtítulo, - lista, **negrito**, *itálico*.</span>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="modal-excluir" style="margin-right:auto; color:var(--danger); display:none;">Excluir</button>
+        <button class="btn btn-secondary" data-fechar-editar>Cancelar</button>
+        <button class="btn btn-primary" id="modal-salvar">Salvar artigo</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: leitura do artigo -->
+  <div class="modal-backdrop" id="modal-backdrop-ler" hidden>
+    <div class="modal modal--largo" id="conteudo-leitura"></div>
+  </div>
+
+  <script>const CTF_RAIZ = "../";</script>
+
+  <script src="../assets/js/utils.js"></script>
+  <script src="../assets/js/events.js"></script>
+  <script src="../assets/js/config.js"></script>
+  <script src="../assets/js/auth.js"></script>
+  <script src="../assets/js/db.js"></script>
+  <script src="../assets/js/catalogo-menu.js"></script>
+  <script src="../assets/js/partials.js"></script>
+  <script src="../assets/js/app-shell.js" defer></script>
+
+  <script defer>
+    let filtroTexto = "";
+
+    function popularSelectsCategoria(categoriaSelecionada) {
+      const categorias = getCategorias("artigo");
+      document.getElementById("filtro-categoria").innerHTML =
+        '<option value="">Todas as categorias</option>' + categorias.map((c) => `<option value="${c.nome}">${c.nome}</option>`).join("");
+      document.getElementById("campo-categoria").innerHTML =
+        categorias.map((c) => `<option value="${c.nome}" ${c.nome === categoriaSelecionada ? "selected" : ""}>${c.nome}</option>`).join("");
+    }
+
+    function ehFavorito(id) {
+      return getAll("favoritos").some((f) => f.tipo === "artigo" && f.refId === id);
+    }
+
+    function previaTexto(conteudo) {
+      const semMarcacao = (conteudo || "").replace(/^#+\s*/gm, "").replace(/^- /gm, "").replace(/\*\*?/g, "");
+      return semMarcacao.length > 140 ? semMarcacao.slice(0, 140) + "…" : semMarcacao;
+    }
+
+    function cardArtigo(artigo) {
+      const tags = (artigo.tags || []).map((t) => `<span class="badge badge--muted">${t}</span>`).join("");
+      return `
+        <div class="card card-hover" style="cursor:pointer;" data-abrir="${artigo.id}">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
+            <div>
+              <strong style="color:var(--ink); font-size:14px;">${artigo.titulo}</strong>
+              <div><span class="badge badge--accent">${artigo.categoria}</span></div>
+            </div>
+            <div style="display:flex; gap:2px;">
+              <button class="icon-btn favorito ${ehFavorito(artigo.id) ? "ativo" : ""}" data-acao="favoritar" data-id="${artigo.id}" title="Favoritar">
+                <svg viewBox="0 0 24 24" fill="${ehFavorito(artigo.id) ? "currentColor" : "none"}" stroke="currentColor" stroke-width="1.8"><path d="M12 2l2.9 6.3L21 9l-4.9 4.3L17.5 20 12 16.6 6.5 20l1.4-6.7L3 9l6.1-.7z"/></svg>
+              </button>
+              <button class="icon-btn excluir" data-acao="excluir" data-id="${artigo.id}" title="Excluir">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m2 0-1 14a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1L5 6"/></svg>
+              </button>
+            </div>
+          </div>
+          <p style="margin-top:8px; color:var(--muted); font-size:13px;">${previaTexto(artigo.conteudo)}</p>
+          ${tags ? `<div class="arquivo-tags" style="margin-top:8px;">${tags}</div>` : ""}
+        </div>`;
+    }
+
+    function renderizarArtigos() {
+      const filtroCategoria = document.getElementById("filtro-categoria").value;
+      const artigos = getAll("artigos")
+        .filter((a) => (a.titulo + " " + (a.tags || []).join(" ")).toLowerCase().includes(filtroTexto.toLowerCase()))
+        .filter((a) => !filtroCategoria || a.categoria === filtroCategoria)
+        .sort((a, b) => a.titulo.localeCompare(b.titulo));
+
+      const lista = document.getElementById("lista-artigos");
+      const vazio = document.getElementById("estado-vazio");
+      lista.innerHTML = artigos.map(cardArtigo).join("");
+      vazio.hidden = artigos.length !== 0;
+    }
+
+    /* ---------- Modal de edição ---------- */
+    function abrirModalEditar(artigo = null) {
+      popularSelectsCategoria(artigo?.categoria);
+      document.getElementById("modal-titulo").textContent = artigo ? "Editar artigo" : "Novo artigo";
+      document.getElementById("modal-excluir").style.display = artigo ? "inline-flex" : "none";
+      document.getElementById("campo-id").value = artigo?.id || "";
+      document.getElementById("campo-titulo-form").value = artigo?.titulo || "";
+      document.getElementById("campo-categoria").value = artigo?.categoria || "";
+      document.getElementById("campo-tags").value = (artigo?.tags || []).join(", ");
+      document.getElementById("campo-link").value = artigo?.link || "";
+      document.getElementById("campo-conteudo").value = artigo?.conteudo || "";
+      document.getElementById("modal-backdrop-editar").hidden = false;
+      document.getElementById("campo-titulo-form").focus();
+    }
+    function fecharModalEditar() { document.getElementById("modal-backdrop-editar").hidden = true; }
+
+    function salvarArtigo() {
+      const id = document.getElementById("campo-id").value;
+      const titulo = document.getElementById("campo-titulo-form").value.trim();
+      if (!titulo) { document.getElementById("campo-titulo-form").focus(); return; }
+      const dados = {
+        titulo,
+        categoria: document.getElementById("campo-categoria").value,
+        tags: document.getElementById("campo-tags").value.split(",").map((t) => t.trim()).filter(Boolean),
+        link: document.getElementById("campo-link").value.trim(),
+        conteudo: document.getElementById("campo-conteudo").value,
+      };
+      if (id) atualizar("artigos", id, dados);
+      else inserir("artigos", dados);
+      fecharModalEditar();
+      renderizarArtigos();
+    }
+
+    function excluirArtigo(id) {
+      const artigo = getPorId("artigos", id);
+      if (confirm(`Excluir "${artigo.titulo}"?`)) {
+        remover("artigos", id);
+        renderizarArtigos();
+      }
+    }
+
+    /* ---------- Modal de leitura ---------- */
+    function abrirLeitura(id) {
+      const artigo = getPorId("artigos", id);
+      document.getElementById("conteudo-leitura").innerHTML = `
+        <div class="modal-header">
+          <div>
+            <h3>${artigo.titulo}</h3>
+            <span class="badge badge--accent">${artigo.categoria}</span>
+            ${artigo.link ? `<a href="${artigo.link}" target="_blank" rel="noopener" style="margin-left:8px; font-size:12px; color:var(--accent);">${artigo.link}</a>` : ""}
+          </div>
+          <button class="icon-btn" data-fechar-leitura aria-label="Fechar">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 6 6 18M6 6l12 12"/></svg>
+          </button>
+        </div>
+        <div class="conteudo-artigo">${renderizarMarkdownLite(artigo.conteudo || "")}</div>
+        ${(artigo.tags || []).length ? `<div class="arquivo-tags" style="margin-top:10px;">${artigo.tags.map((t) => `<span class="badge badge--muted">${t}</span>`).join("")}</div>` : ""}
+        <div class="modal-footer">
+          <button class="btn btn-secondary" id="leitura-editar">Editar</button>
+        </div>`;
+      document.querySelector("#conteudo-leitura [data-fechar-leitura]").addEventListener("click", fecharLeitura);
+      document.getElementById("leitura-editar").addEventListener("click", () => { fecharLeitura(); abrirModalEditar(artigo); });
+      document.getElementById("modal-backdrop-ler").hidden = false;
+    }
+    function fecharLeitura() { document.getElementById("modal-backdrop-ler").hidden = true; }
+
+    window.addEventListener("ctf:shell-pronto", () => {
+      popularSelectsCategoria();
+      renderizarArtigos();
+      document.getElementById("busca-global")?.addEventListener("input", (e) => {
+        filtroTexto = e.target.value;
+        renderizarArtigos();
+      });
+      document.getElementById("filtro-categoria").addEventListener("change", renderizarArtigos);
+      onDadosMudarem("artigos", renderizarArtigos);
+      onDadosMudarem("favoritos", renderizarArtigos);
+      onDadosMudarem("categorias", () => popularSelectsCategoria());
+    });
+
+    document.getElementById("botao-novo-artigo").addEventListener("click", () => abrirModalEditar());
+    document.querySelectorAll("[data-fechar-editar]").forEach((el) => el.addEventListener("click", fecharModalEditar));
+    document.getElementById("modal-backdrop-editar").addEventListener("click", (e) => { if (e.target.id === "modal-backdrop-editar") fecharModalEditar(); });
+    document.getElementById("modal-salvar").addEventListener("click", salvarArtigo);
+    document.getElementById("modal-excluir").addEventListener("click", () => {
+      const id = document.getElementById("campo-id").value;
+      fecharModalEditar();
+      if (id) excluirArtigo(id);
+    });
+    document.getElementById("modal-backdrop-ler").addEventListener("click", (e) => { if (e.target.id === "modal-backdrop-ler") fecharLeitura(); });
+
+    document.getElementById("lista-artigos").addEventListener("click", (e) => {
+      const acaoBotao = e.target.closest("[data-acao]");
+      if (acaoBotao) {
+        const id = acaoBotao.dataset.id;
+        if (acaoBotao.dataset.acao === "excluir") excluirArtigo(id);
+        if (acaoBotao.dataset.acao === "favoritar") { alternarFavorito("artigo", id); renderizarArtigos(); }
+        return;
+      }
+      const abrir = e.target.closest("[data-abrir]");
+      if (abrir) abrirLeitura(abrir.dataset.abrir);
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,88 @@
+/* ==========================================================================
+   BASE.CSS — reset + comportamento global. Importado por toda página, sempre
+   depois de tokens.css e antes de components.css.
+   ========================================================================== */
+
+@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap");
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body { height: 100%; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  line-height: 1.25;
+  margin: 0 0 4px;
+  color: var(--ink);
+}
+
+p { margin: 0 0 8px; }
+
+a { color: inherit; text-decoration: none; }
+
+button, input, select, textarea { font-family: inherit; font-size: inherit; color: inherit; }
+
+ul { list-style: none; margin: 0; padding: 0; }
+
+::selection { background: var(--accent-soft); color: var(--accent); }
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Respeita usuários que preferem menos animação */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+}
+
+/* --- Grade do "app shell": sidebar fixa + header + conteúdo --- */
+.app-shell {
+  display: grid;
+  grid-template-columns: var(--sidebar-w) 1fr;
+  grid-template-rows: var(--header-h) 1fr;
+  grid-template-areas:
+    "sidebar header"
+    "sidebar main";
+  min-height: 100vh;
+}
+
+#app-sidebar { grid-area: sidebar; }
+#app-header  { grid-area: header; }
+
+main.app-main {
+  grid-area: main;
+  padding: 28px 32px;
+  overflow-y: auto;
+  max-width: 1280px;
+  width: 100%;
+}
+
+@media (max-width: 880px) {
+  .app-shell {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "header"
+      "main";
+  }
+  #app-sidebar {
+    position: fixed;
+    inset: 0 25% 0 0;
+    z-index: 40;
+    transform: translateX(-100%);
+    transition: transform 0.22s ease;
+  }
+  body.sidebar-open #app-sidebar { transform: translateX(0); }
+  main.app-main { padding: 20px; }
+}

@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Central de Ferramentas — Layouts de Relatório</title>
+
+  <script>
+    document.documentElement.dataset.theme = localStorage.getItem("ctf_tema") || "dark";
+  </script>
+
+  <link rel="stylesheet" href="../assets/css/tokens.css" />
+  <link rel="stylesheet" href="../assets/css/base.css" />
+  <link rel="stylesheet" href="../assets/css/components.css" />
+</head>
+<body data-module="relatorios">
+  <div class="app-shell">
+    <div id="app-sidebar"></div>
+    <div id="app-header"></div>
+
+    <main class="app-main">
+      <a href="index.html" class="btn btn-ghost" style="padding-left:0; margin-bottom:8px;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M15 18l-6-6 6-6"/></svg>
+        Voltar para Relatórios
+      </a>
+
+      <!-- ===== Tela 1: lista de layouts ===== -->
+      <div id="tela-lista">
+        <div class="page-header">
+          <div>
+            <h1>Layouts</h1>
+            <p style="color:var(--muted)">Modelos de arranjo de blocos — use um pronto ou crie o seu, para reaproveitar ao criar novos relatórios.</p>
+          </div>
+          <button class="btn btn-primary" id="botao-novo-layout">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 5v14M5 12h14"/></svg>
+            Novo layout
+          </button>
+        </div>
+
+        <div id="lista-layouts" class="grid-cards"></div>
+      </div>
+
+      <!-- ===== Tela 2: construtor visual ===== -->
+      <div id="tela-construtor" hidden>
+        <div class="page-header">
+          <div style="flex:1;">
+            <input class="input" id="campo-nome" placeholder="Nome do layout" style="font-family:var(--font-display); font-size:20px; font-weight:600; height:auto; padding:8px 12px; max-width:360px;" />
+          </div>
+          <div style="display:flex; gap:8px;">
+            <button class="btn btn-secondary" id="botao-cancelar-construtor">Cancelar</button>
+            <button class="btn btn-primary" id="botao-salvar-construtor">Salvar layout</button>
+          </div>
+        </div>
+
+        <p class="subsection-title" style="margin-top:0;">Arraste um bloco para a área abaixo (ou clique para adicionar)</p>
+        <div class="paleta-blocos">
+          <div class="paleta-item" draggable="true" data-tipo="kpi">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 3v18h18"/><circle cx="16" cy="9" r="2"/></svg>
+            Número
+          </div>
+          <div class="paleta-item" draggable="true" data-tipo="barras">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 6h10M4 12h16M4 18h7"/></svg>
+            Barras
+          </div>
+          <div class="paleta-item" draggable="true" data-tipo="colunas">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 20V10M10 20V4M16 20v-7"/></svg>
+            Colunas
+          </div>
+          <div class="paleta-item" draggable="true" data-tipo="rosca">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 9 9h-9z"/></svg>
+            Rosca
+          </div>
+          <div class="paleta-item" draggable="true" data-tipo="tabela">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="4" width="18" height="16" rx="1"/><path d="M3 10h18M9 4v16"/></svg>
+            Tabela
+          </div>
+        </div>
+
+        <p class="subsection-title">Prévia do layout</p>
+        <div class="tela-layout" id="tela-layout"></div>
+        <p style="font-size:11px; color:var(--muted); margin-top:8px;">Arraste os blocos já colocados para reordenar. O tamanho (⛶) muda a largura dentro do relatório.</p>
+      </div>
+    </main>
+  </div>
+
+  <script>const CTF_RAIZ = "../";</script>
+
+  <script src="../assets/js/utils.js"></script>
+  <script src="../assets/js/events.js"></script>
+  <script src="../assets/js/config.js"></script>
+  <script src="../assets/js/auth.js"></script>
+  <script src="../assets/js/db.js"></script>
+  <script src="../assets/js/catalogo-relatorios.js"></script>
+  <script src="../assets/js/catalogo-menu.js"></script>
+  <script src="../assets/js/partials.js"></script>
+  <script src="../assets/js/app-shell.js" defer></script>
+
+  <script defer>
+    const ROTULOS_TIPO = { kpi: "Número", barras: "Barras", colunas: "Colunas", rosca: "Rosca", tabela: "Tabela" };
+    const ROTULOS_LARGURA = { completa: "Completa", metade: "1/2", terco: "1/3" };
+    let slotsEmEdicao = [];
+    let layoutEmEdicaoId = null;
+    let indiceArrastado = null;
+
+    /* ---------- Lista ---------- */
+    function cardLayout(layout) {
+      return `
+        <div class="card">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
+            <div>
+              <strong style="font-size:14px;">${layout.nome}</strong>
+              ${layout.padrao ? '<span class="badge badge--muted" style="margin-left:6px;">padrão</span>' : ""}
+            </div>
+            <div style="display:flex; gap:2px;">
+              <button class="icon-btn" data-acao="editar" data-id="${layout.id}" title="Editar">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
+              </button>
+              <button class="icon-btn excluir" data-acao="excluir" data-id="${layout.id}" title="Excluir">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m2 0-1 14a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1L5 6"/></svg>
+              </button>
+            </div>
+          </div>
+          <div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:10px;">
+            ${layout.slots.map((s) => `<span class="badge badge--muted">${ROTULOS_TIPO[s.tipo]} · ${ROTULOS_LARGURA[s.largura]}</span>`).join("")}
+          </div>
+          <a class="btn btn-secondary" style="width:100%; margin-top:12px;" href="index.html">Usar este layout</a>
+        </div>`;
+    }
+
+    function renderizarLayouts() {
+      const layouts = getAll("layouts").sort((a, b) => a.nome.localeCompare(b.nome));
+      document.getElementById("lista-layouts").innerHTML = layouts.map(cardLayout).join("");
+    }
+
+    /* ---------- Construtor visual ---------- */
+    function previaConteudo(tipo) {
+      if (tipo === "kpi") return '<div class="preview-mock-kpi"><div class="rotulo">Ex: Faturamento</div><div class="valor">R$ 12.4k</div></div>';
+      if (tipo === "barras") return `<div class="preview-mock-barras"><span style="width:90%"></span><span style="width:65%"></span><span style="width:40%"></span></div>`;
+      if (tipo === "colunas") return `<div class="preview-mock-colunas"><span style="height:100%"></span><span style="height:70%"></span><span style="height:85%"></span><span style="height:45%"></span></div>`;
+      if (tipo === "rosca") return `<div class="preview-mock-rosca"></div>`;
+      if (tipo === "tabela") return `<div class="preview-mock-tabela"><span style="width:100%"></span><span style="width:90%"></span><span style="width:95%"></span><span style="width:80%"></span></div>`;
+      return "";
+    }
+
+    function renderizarTelaLayout() {
+      const tela = document.getElementById("tela-layout");
+      if (slotsEmEdicao.length === 0) {
+        tela.innerHTML = '<div class="tela-layout-vazio">Arraste um bloco da paleta acima para começar</div>';
+        return;
+      }
+      tela.innerHTML = slotsEmEdicao.map((slot, i) => `
+        <div class="preview-bloco largura-${slot.largura}" draggable="true" data-indice="${i}">
+          <div class="preview-bloco-topo">
+            <span class="preview-bloco-label">${ROTULOS_TIPO[slot.tipo]}</span>
+            <div class="preview-bloco-acoes">
+              <select class="preview-select-largura" data-largura-indice="${i}">
+                <option value="completa" ${slot.largura === "completa" ? "selected" : ""}>Completa</option>
+                <option value="metade" ${slot.largura === "metade" ? "selected" : ""}>1/2</option>
+                <option value="terco" ${slot.largura === "terco" ? "selected" : ""}>1/3</option>
+              </select>
+              <button class="icon-btn excluir" data-remover-indice="${i}" title="Remover" style="width:22px; height:22px;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="width:12px;height:12px;"><path d="M18 6 6 18M6 6l12 12"/></svg>
+              </button>
+            </div>
+          </div>
+          ${previaConteudo(slot.tipo)}
+        </div>`).join("");
+
+      ativarDragAndDropCanvas();
+    }
+
+    function ativarDragAndDropCanvas() {
+      const tela = document.getElementById("tela-layout");
+      tela.querySelectorAll(".preview-bloco").forEach((el) => {
+        el.addEventListener("dragstart", (e) => {
+          indiceArrastado = Number(el.dataset.indice);
+          el.classList.add("arrastando");
+          e.dataTransfer.setData("text/plain", `mover:${indiceArrastado}`);
+        });
+        el.addEventListener("dragend", () => el.classList.remove("arrastando"));
+        el.addEventListener("dragover", (e) => { e.preventDefault(); el.classList.add("arrastando-sobre"); });
+        el.addEventListener("dragleave", () => el.classList.remove("arrastando-sobre"));
+        el.addEventListener("drop", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          el.classList.remove("arrastando-sobre");
+          inserirNoIndice(e.dataTransfer.getData("text/plain"), Number(el.dataset.indice));
+        });
+      });
+    }
+
+    function inserirNoIndice(dado, indiceAlvo) {
+      if (dado.startsWith("novo:")) {
+        const tipo = dado.slice(5);
+        slotsEmEdicao.splice(indiceAlvo, 0, { tipo, largura: "completa" });
+      } else if (dado.startsWith("mover:")) {
+        const origem = Number(dado.slice(6));
+        if (origem === indiceAlvo) return;
+        const [item] = slotsEmEdicao.splice(origem, 1);
+        const destino = origem < indiceAlvo ? indiceAlvo - 1 : indiceAlvo;
+        slotsEmEdicao.splice(destino, 0, item);
+      }
+      renderizarTelaLayout();
+    }
+
+    const tela = document.getElementById("tela-layout");
+    tela.addEventListener("dragover", (e) => { e.preventDefault(); tela.classList.add("arrastando-sobre"); });
+    tela.addEventListener("dragleave", (e) => { if (e.target === tela) tela.classList.remove("arrastando-sobre"); });
+    tela.addEventListener("drop", (e) => {
+      e.preventDefault();
+      tela.classList.remove("arrastando-sobre");
+      if (e.target.closest(".preview-bloco")) return; // já tratado pelo bloco específico
+      inserirNoIndice(e.dataTransfer.getData("text/plain"), slotsEmEdicao.length);
+    });
+
+    tela.addEventListener("change", (e) => {
+      const select = e.target.closest("[data-largura-indice]");
+      if (!select) return;
+      slotsEmEdicao[Number(select.dataset.larguraIndice)].largura = select.value;
+      renderizarTelaLayout();
+    });
+    tela.addEventListener("click", (e) => {
+      const remover = e.target.closest("[data-remover-indice]");
+      if (!remover) return;
+      slotsEmEdicao.splice(Number(remover.dataset.removerIndice), 1);
+      renderizarTelaLayout();
+    });
+
+    document.querySelectorAll(".paleta-item").forEach((item) => {
+      item.addEventListener("dragstart", (e) => e.dataTransfer.setData("text/plain", `novo:${item.dataset.tipo}`));
+      item.addEventListener("click", () => {
+        slotsEmEdicao.push({ tipo: item.dataset.tipo, largura: "completa" });
+        renderizarTelaLayout();
+      });
+    });
+
+    /* ---------- Alternar entre telas ---------- */
+    function abrirConstrutor(layout = null) {
+      layoutEmEdicaoId = layout?.id || null;
+      document.getElementById("campo-nome").value = layout?.nome || "";
+      slotsEmEdicao = layout ? JSON.parse(JSON.stringify(layout.slots)) : [];
+      renderizarTelaLayout();
+      document.getElementById("tela-lista").hidden = true;
+      document.getElementById("tela-construtor").hidden = false;
+      document.getElementById("campo-nome").focus();
+    }
+    function voltarParaLista() {
+      document.getElementById("tela-construtor").hidden = true;
+      document.getElementById("tela-lista").hidden = false;
+      renderizarLayouts();
+    }
+
+    function salvarLayout() {
+      const nome = document.getElementById("campo-nome").value.trim();
+      if (!nome) { document.getElementById("campo-nome").focus(); return; }
+      if (slotsEmEdicao.length === 0) { alert("Adicione pelo menos um bloco ao layout."); return; }
+      if (layoutEmEdicaoId) atualizar("layouts", layoutEmEdicaoId, { nome, slots: slotsEmEdicao });
+      else inserir("layouts", { nome, slots: slotsEmEdicao, padrao: false });
+      voltarParaLista();
+    }
+
+    function excluirLayout(id) {
+      const layout = getPorId("layouts", id);
+      if (confirm(`Excluir o layout "${layout.nome}"? Relatórios já criados com ele não são afetados.`)) {
+        remover("layouts", id);
+        renderizarLayouts();
+      }
+    }
+
+    window.addEventListener("ctf:shell-pronto", () => {
+      renderizarLayouts();
+      onDadosMudarem("layouts", () => { if (!document.getElementById("tela-construtor").hidden) return; renderizarLayouts(); });
+    });
+
+    document.getElementById("botao-novo-layout").addEventListener("click", () => abrirConstrutor());
+    document.getElementById("botao-cancelar-construtor").addEventListener("click", voltarParaLista);
+    document.getElementById("botao-salvar-construtor").addEventListener("click", salvarLayout);
+
+    document.getElementById("lista-layouts").addEventListener("click", (e) => {
+      const botao = e.target.closest("[data-acao]");
+      if (!botao) return;
+      const id = botao.dataset.id;
+      if (botao.dataset.acao === "editar") abrirConstrutor(getPorId("layouts", id));
+      if (botao.dataset.acao === "excluir") excluirLayout(id);
+    });
+  </script>
+</body>
+</html>

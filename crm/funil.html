@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Central de Ferramentas — Funil de Vendas</title>
+
+  <script>
+    document.documentElement.dataset.theme = localStorage.getItem("ctf_tema") || "dark";
+  </script>
+
+  <link rel="stylesheet" href="../assets/css/tokens.css" />
+  <link rel="stylesheet" href="../assets/css/base.css" />
+  <link rel="stylesheet" href="../assets/css/components.css" />
+</head>
+<body data-module="crm-funil">
+  <div class="app-shell">
+    <div id="app-sidebar"></div>
+    <div id="app-header"></div>
+
+    <main class="app-main">
+      <div class="page-header">
+        <div>
+          <h1>Funil de Vendas</h1>
+          <p style="color:var(--muted)">Oportunidades vinculadas a um cliente e a um produto.</p>
+        </div>
+        <button class="btn btn-primary" id="botao-nova-oportunidade">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 5v14M5 12h14"/></svg>
+          Nova oportunidade
+        </button>
+      </div>
+
+      <div id="estado-sem-dados" class="empty-state" hidden>
+        <h3>Cadastre um cliente e um produto antes</h3>
+        <p>Toda oportunidade precisa estar vinculada a um cliente e a um produto.</p>
+        <div style="display:flex; gap:8px; justify-content:center; margin-top:10px;">
+          <a class="btn btn-secondary" href="index.html">Ir para Clientes</a>
+          <a class="btn btn-secondary" href="produtos.html">Ir para Produtos</a>
+        </div>
+      </div>
+
+      <div id="quadro" class="kanban-board"></div>
+    </main>
+  </div>
+
+  <div class="modal-backdrop" id="modal-backdrop" hidden>
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="modal-titulo">Nova oportunidade</h3>
+        <button class="icon-btn" id="modal-fechar" aria-label="Fechar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <input type="hidden" id="campo-id" />
+      <input type="hidden" id="campo-etapa" />
+
+      <div class="field">
+        <label for="campo-titulo">Nome da negociação *</label>
+        <input class="input" id="campo-titulo" placeholder="Ex: Nova consultoria - Nexa Varejo" />
+      </div>
+
+      <div class="field">
+        <label for="campo-cliente">Cliente *</label>
+        <select class="input" id="campo-cliente"></select>
+      </div>
+
+      <div class="field">
+        <label for="campo-produto">Produto *</label>
+        <select class="input" id="campo-produto"></select>
+      </div>
+
+      <div class="field">
+        <label for="campo-valor">Valor (R$)</label>
+        <input class="input" type="number" min="0" step="0.01" id="campo-valor" />
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="modal-excluir" style="margin-right:auto; color:var(--danger); display:none;">Excluir</button>
+        <button class="btn btn-secondary" id="modal-cancelar">Cancelar</button>
+        <button class="btn btn-primary" id="modal-salvar">Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <script>const CTF_RAIZ = "../";</script>
+
+  <script src="../assets/js/utils.js"></script>
+  <script src="../assets/js/events.js"></script>
+  <script src="../assets/js/config.js"></script>
+  <script src="../assets/js/auth.js"></script>
+  <script src="../assets/js/db.js"></script>
+  <script src="../assets/js/catalogo-menu.js"></script>
+  <script src="../assets/js/partials.js"></script>
+  <script src="../assets/js/app-shell.js" defer></script>
+
+  <script defer>
+    const ETAPAS = [
+      { id: "lead", label: "Lead" },
+      { id: "contato", label: "Contato" },
+      { id: "proposta", label: "Proposta" },
+      { id: "negociacao", label: "Negociação" },
+      { id: "ganho", label: "Ganho ✓" },
+      { id: "perdido", label: "Perdido ✕" },
+    ];
+
+    function cardOportunidade(oportunidade, indiceEtapa) {
+      const cor = oportunidade.cliente?.cor || "var(--muted)";
+      const podeVoltar = indiceEtapa > 0;
+      const podeAvancar = indiceEtapa < ETAPAS.length - 1;
+      return `
+        <div class="task-card" style="border-left-color:${cor}" draggable="true" data-id="${oportunidade.id}">
+          <div class="task-card-titulo">${oportunidade.titulo}</div>
+          <div class="client-tag" style="margin-bottom:6px;">
+            <span class="client-dot" style="background:${cor}"></span>
+            ${oportunidade.cliente?.nome || "Cliente removido"}
+          </div>
+          <div class="task-card-meta">
+            <span class="badge badge--muted">${oportunidade.produto?.nome || "Produto removido"}</span>
+            <strong style="font-size:12px; color:var(--accent);">${formatarMoeda(oportunidade.valor)}</strong>
+          </div>
+          <div class="task-card-mover">
+            <button class="icon-btn" data-mover="${oportunidade.id}" data-direcao="-1" ${podeVoltar ? "" : "disabled style='opacity:.3'"} title="Etapa anterior">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+            </button>
+            <button class="icon-btn" data-editar="${oportunidade.id}" title="Editar" style="flex:1;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
+            </button>
+            <button class="icon-btn" data-mover="${oportunidade.id}" data-direcao="1" ${podeAvancar ? "" : "disabled style='opacity:.3'"} title="Próxima etapa">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+            </button>
+          </div>
+        </div>`;
+    }
+
+    function renderizarQuadro() {
+      const temClientes = getAll("clientes").length > 0;
+      const temProdutos = getAll("produtos").length > 0;
+      const semDados = !temClientes || !temProdutos;
+      document.getElementById("estado-sem-dados").hidden = !semDados;
+      document.getElementById("botao-nova-oportunidade").disabled = semDados;
+      document.getElementById("botao-nova-oportunidade").style.opacity = semDados ? 0.5 : 1;
+      if (semDados) {
+        document.getElementById("quadro").innerHTML = "";
+        return;
+      }
+
+      const oportunidades = getOportunidadesComDados();
+
+      document.getElementById("quadro").innerHTML = ETAPAS.map((etapa, indice) => {
+        const desta = oportunidades.filter((o) => o.etapa === etapa.id);
+        const total = desta.reduce((soma, o) => soma + (Number(o.valor) || 0), 0);
+        return `
+          <div class="kanban-coluna" data-etapa="${etapa.id}">
+            <div class="kanban-coluna-header">
+              <span class="kanban-coluna-titulo">${etapa.label} <span class="badge badge--muted">${desta.length}</span></span>
+              <button class="icon-btn" data-nova-em="${etapa.id}" title="Nova oportunidade">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 5v14M5 12h14"/></svg>
+              </button>
+            </div>
+            ${total > 0 ? `<p style="font-size:11px; color:var(--muted); margin:-4px 4px 8px;">${formatarMoeda(total)}</p>` : ""}
+            <div class="kanban-lista" data-etapa="${etapa.id}">
+              ${desta.map((o) => cardOportunidade(o, indice)).join("")}
+            </div>
+          </div>`;
+      }).join("");
+
+      ativarDragAndDrop();
+    }
+
+    function ativarDragAndDrop() {
+      document.querySelectorAll(".task-card").forEach((card) => {
+        card.addEventListener("dragstart", (e) => e.dataTransfer.setData("text/plain", card.dataset.id));
+      });
+      document.querySelectorAll(".kanban-coluna").forEach((coluna) => {
+        coluna.addEventListener("dragover", (e) => { e.preventDefault(); coluna.classList.add("arrastando-sobre"); });
+        coluna.addEventListener("dragleave", () => coluna.classList.remove("arrastando-sobre"));
+        coluna.addEventListener("drop", (e) => {
+          e.preventDefault();
+          coluna.classList.remove("arrastando-sobre");
+          const id = e.dataTransfer.getData("text/plain");
+          atualizar("oportunidades", id, { etapa: coluna.dataset.etapa });
+          renderizarQuadro();
+        });
+      });
+    }
+
+    function popularSelects(oportunidade) {
+      document.getElementById("campo-cliente").innerHTML = getAll("clientes")
+        .sort((a, b) => a.nome.localeCompare(b.nome))
+        .map((c) => `<option value="${c.id}" ${c.id === oportunidade?.clienteId ? "selected" : ""}>${c.nome}</option>`)
+        .join("");
+
+      document.getElementById("campo-produto").innerHTML = getAll("produtos")
+        .sort((a, b) => a.nome.localeCompare(b.nome))
+        .map((p) => `<option value="${p.id}" data-preco="${p.preco}" ${p.id === oportunidade?.produtoId ? "selected" : ""}>${p.nome} — ${formatarMoeda(p.preco)}</option>`)
+        .join("");
+    }
+
+    function abrirModalNova(etapaId) {
+      document.getElementById("modal-titulo").textContent = "Nova oportunidade";
+      document.getElementById("modal-excluir").style.display = "none";
+      popularSelects(null);
+      document.getElementById("campo-id").value = "";
+      document.getElementById("campo-etapa").value = etapaId;
+      document.getElementById("campo-titulo").value = "";
+      document.getElementById("campo-valor").value = document.getElementById("campo-produto").selectedOptions[0]?.dataset.preco || "";
+      document.getElementById("modal-backdrop").hidden = false;
+      document.getElementById("campo-titulo").focus();
+    }
+
+    function abrirModalEditar(id) {
+      const oportunidade = getPorId("oportunidades", id);
+      document.getElementById("modal-titulo").textContent = "Editar oportunidade";
+      document.getElementById("modal-excluir").style.display = "inline-flex";
+      popularSelects(oportunidade);
+      document.getElementById("campo-id").value = oportunidade.id;
+      document.getElementById("campo-etapa").value = oportunidade.etapa;
+      document.getElementById("campo-titulo").value = oportunidade.titulo;
+      document.getElementById("campo-valor").value = oportunidade.valor;
+      document.getElementById("modal-backdrop").hidden = false;
+      document.getElementById("campo-titulo").focus();
+    }
+
+    function fecharModal() {
+      document.getElementById("modal-backdrop").hidden = true;
+    }
+
+    function salvarOportunidade() {
+      const id = document.getElementById("campo-id").value;
+      const titulo = document.getElementById("campo-titulo").value.trim();
+      const clienteId = document.getElementById("campo-cliente").value;
+      const produtoId = document.getElementById("campo-produto").value;
+      const valor = parseFloat(document.getElementById("campo-valor").value) || 0;
+      if (!titulo || !clienteId || !produtoId) {
+        document.getElementById("campo-titulo").focus();
+        return;
+      }
+      const dados = { titulo, clienteId, produtoId, valor, etapa: document.getElementById("campo-etapa").value };
+      if (id) atualizar("oportunidades", id, dados);
+      else inserir("oportunidades", dados);
+      fecharModal();
+      renderizarQuadro();
+    }
+
+    function moverOportunidade(id, direcao) {
+      const oportunidade = getPorId("oportunidades", id);
+      const indiceAtual = ETAPAS.findIndex((e) => e.id === oportunidade.etapa);
+      const novoIndice = indiceAtual + direcao;
+      if (novoIndice < 0 || novoIndice >= ETAPAS.length) return;
+      atualizar("oportunidades", id, { etapa: ETAPAS[novoIndice].id });
+      renderizarQuadro();
+    }
+
+    window.addEventListener("ctf:shell-pronto", () => {
+      renderizarQuadro();
+      onDadosMudarem("oportunidades", renderizarQuadro);
+      onDadosMudarem("clientes", renderizarQuadro);
+      onDadosMudarem("produtos", renderizarQuadro);
+    });
+
+    document.getElementById("campo-produto")?.addEventListener("change", (e) => {
+      const preco = e.target.selectedOptions[0]?.dataset.preco;
+      if (preco) document.getElementById("campo-valor").value = preco;
+    });
+
+    document.getElementById("botao-nova-oportunidade").addEventListener("click", () => abrirModalNova("lead"));
+    document.getElementById("modal-fechar").addEventListener("click", fecharModal);
+    document.getElementById("modal-cancelar").addEventListener("click", fecharModal);
+    document.getElementById("modal-backdrop").addEventListener("click", (e) => {
+      if (e.target.id === "modal-backdrop") fecharModal();
+    });
+    document.getElementById("modal-salvar").addEventListener("click", salvarOportunidade);
+    document.getElementById("modal-excluir").addEventListener("click", () => {
+      const id = document.getElementById("campo-id").value;
+      if (id && confirm("Excluir esta oportunidade?")) {
+        remover("oportunidades", id);
+        fecharModal();
+        renderizarQuadro();
+      }
+    });
+
+    document.getElementById("quadro").addEventListener("click", (e) => {
+      const botaoNova = e.target.closest("[data-nova-em]");
+      if (botaoNova) return abrirModalNova(botaoNova.dataset.novaEm);
+      const botaoEditar = e.target.closest("[data-editar]");
+      if (botaoEditar) return abrirModalEditar(botaoEditar.dataset.editar);
+      const botaoMover = e.target.closest("[data-mover]");
+      if (botaoMover) return moverOportunidade(botaoMover.dataset.mover, Number(botaoMover.dataset.direcao));
+    });
+  </script>
+</body>
+</html>

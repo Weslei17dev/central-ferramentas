@@ -1,0 +1,2513 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gerador de valor conta e valor ajuste</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* paleta / tokens */
+  :root{
+    --papel:#EDEFE9;
+    --linha-papel:#D9DCD2;
+    --tinta:#232722;
+    --tinta-suave:#5B6058;
+    --cartao:#FBFBF8;
+    --cobre:#B5652D;
+    --cobre-escuro:#8C4A1E;
+    --sabia:#4B6350;
+    --sabia-bg:#E4EBE0;
+    --borda:#C7CBC0;
+    --perigo:#A32D2D;
+    --fundo-input:#FFFFFF;
+    --placeholder:#9A9E93;
+    --destaque-busca:#F3D9A8;
+    --destaque-busca-texto:#232722;
+    --fonte-titulo:'Oswald', sans-serif;
+    --fonte-mono:'IBM Plex Mono', monospace;
+    --fonte-corpo:'Inter', sans-serif;
+    --largura-conteudo:980px;
+  }
+
+  /* tema escuro: mesma paleta conceitual, so troca os valores das variaveis */
+  :root[data-tema="escuro"]{
+    --papel:#1B1D18;
+    --linha-papel:#282B24;
+    --tinta:#E9EAE2;
+    --tinta-suave:#A7ACA0;
+    --cartao:#22251F;
+    --cobre:#D98A4E;
+    --cobre-escuro:#F0A868;
+    --sabia:#8FB08A;
+    --sabia-bg:#2B3529;
+    --borda:#3A3E34;
+    --perigo:#E37373;
+    --fundo-input:#2A2D26;
+    --placeholder:#767B6E;
+    --destaque-busca:#6B5222;
+    --destaque-busca-texto:#F5E6C8;
+  }
+  *{box-sizing:border-box;transition:background-color .15s ease, border-color .15s ease, color .15s ease;}
+  body{
+    margin:0;
+    background:
+      repeating-linear-gradient(0deg, transparent, transparent 27px, var(--linha-papel) 27px, var(--linha-papel) 28px),
+      repeating-linear-gradient(90deg, transparent, transparent 27px, var(--linha-papel) 27px, var(--linha-papel) 28px),
+      var(--papel);
+    color:var(--tinta);
+    font-family:var(--fonte-corpo);
+    padding:32px 20px 60px;
+  }
+  .conteiner{max-width:var(--largura-conteudo);margin:0 auto;}
+
+  /* cabecalho estilo carimbo de projeto */
+  .bloco-titulo{
+    background:var(--cartao);
+    border:1px solid var(--borda);
+    border-radius:2px;
+    padding:20px 24px;
+    margin-bottom:20px;
+    position:relative;
+  }
+  .bloco-titulo::before{
+    content:"";
+    position:absolute;
+    top:6px;left:6px;right:6px;bottom:6px;
+    border:1px solid var(--borda);
+    pointer-events:none;
+  }
+  .rotulo{
+    font-family:var(--fonte-mono);
+    font-size:11px;
+    letter-spacing:.12em;
+    text-transform:uppercase;
+    color:var(--cobre-escuro);
+    margin:0 0 4px;
+  }
+  h1{
+    font-family:var(--fonte-titulo);
+    font-weight:600;
+    font-size:26px;
+    letter-spacing:.01em;
+    margin:0 0 10px;
+    text-transform:uppercase;
+  }
+  .linha-meta{
+    font-family:var(--fonte-mono);
+    font-size:12px;
+    color:var(--tinta-suave);
+    border-top:1px solid var(--borda);
+    padding-top:10px;
+    line-height:1.6;
+  }
+
+  .painel{
+    background:var(--cartao);
+    border:1px solid var(--borda);
+    border-radius:2px;
+    padding:18px 22px;
+    margin-bottom:16px;
+  }
+  .painel h2{
+    font-family:var(--fonte-titulo);
+    text-transform:uppercase;
+    font-size:14px;
+    letter-spacing:.06em;
+    font-weight:600;
+    margin:0 0 14px;
+    color:var(--tinta);
+    border-bottom:1px solid var(--linha-papel);
+    padding-bottom:8px;
+  }
+  .painel h3{
+    font-family:var(--fonte-titulo);
+    text-transform:uppercase;
+    font-size:12.5px;
+    letter-spacing:.05em;
+    font-weight:600;
+    margin:0 0 10px;
+    color:var(--cobre-escuro);
+  }
+
+  .area-soltar{
+    border:2px dashed var(--borda);
+    border-radius:4px;
+    padding:26px;
+    text-align:center;
+    color:var(--tinta-suave);
+    font-size:14px;
+    cursor:pointer;
+    transition:background .15s ease, border-color .15s ease;
+  }
+  .area-soltar.arrastando{
+    background:var(--sabia-bg);
+    border-color:var(--sabia);
+  }
+  .area-soltar strong{color:var(--cobre-escuro);}
+  .area-soltar input{display:none;}
+  .info-arquivo{
+    font-family:var(--fonte-mono);
+    font-size:12px;
+    color:var(--tinta-suave);
+    margin-top:10px;
+  }
+  .info-arquivo b{color:var(--sabia);}
+
+  .linha-campos{
+    display:flex;
+    gap:16px;
+    flex-wrap:wrap;
+    margin-bottom:12px;
+  }
+  .campo{
+    flex:1;
+    min-width:180px;
+  }
+  .campo label{
+    display:block;
+    font-family:var(--fonte-mono);
+    font-size:11px;
+    letter-spacing:.05em;
+    text-transform:uppercase;
+    color:var(--tinta-suave);
+    margin-bottom:5px;
+  }
+  .campo select, .campo input[type=text], .campo input[type=number]{
+    width:100%;
+    padding:9px 10px;
+    border:1px solid var(--borda);
+    border-radius:2px;
+    background:var(--fundo-input);
+    font-family:var(--fonte-mono);
+    font-size:13px;
+    color:var(--tinta);
+  }
+  .campo select:focus, .campo input:focus{
+    outline:none;
+    border-color:var(--cobre);
+  }
+  .grupo-opcoes{
+    display:flex;
+    gap:14px;
+    flex-wrap:wrap;
+    margin-bottom:12px;
+  }
+  .grupo-opcoes label{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    font-size:13px;
+    color:var(--tinta);
+    cursor:pointer;
+  }
+  .grupo-opcoes input{accent-color:var(--cobre);}
+
+  .botao{
+    border:2px solid var(--tinta);
+    background:var(--cobre);
+    color:#fff;
+    font-family:var(--fonte-titulo);
+    font-weight:500;
+    letter-spacing:.04em;
+    text-transform:uppercase;
+    font-size:13px;
+    padding:11px 20px;
+    cursor:pointer;
+    border-radius:2px;
+    transition:background .15s ease;
+  }
+  .botao:hover{background:var(--cobre-escuro);}
+  .botao:active{transform:translateY(1px);}
+  .botao.secundario{
+    background:transparent;
+    color:var(--tinta);
+    border-color:var(--borda);
+  }
+  .botao.secundario:hover{background:var(--linha-papel);}
+  .linha-botoes{display:flex;gap:10px;flex-wrap:wrap;margin-top:4px;align-items:center;}
+
+  /* campos personalizados: um "cartao" por campo, com sub-secoes de arredondamento e formatacao */
+  .cartao-campo-personalizado, .cartao-faixa-valor{
+    background:var(--papel);
+    border:1px solid var(--linha-papel);
+    border-radius:2px;
+    padding:12px 14px;
+    margin-bottom:10px;
+  }
+  .cartao-campo-personalizado.campo-com-erro{
+    border-color:var(--perigo);
+  }
+  .linha-topo-campo{
+    display:flex;
+    gap:8px;
+    align-items:center;
+    margin-bottom:10px;
+  }
+  .linha-topo-campo .campo-nome{
+    flex:1;
+    font-family:var(--fonte-mono);
+    font-weight:600;
+  }
+  .botoes-ordem{display:flex;gap:4px;}
+  .botao-ordem{
+    border:1px solid var(--borda);
+    background:var(--fundo-input);
+    color:var(--tinta-suave);
+    font-size:13px;
+    width:28px;
+    height:34px;
+    border-radius:2px;
+    cursor:pointer;
+  }
+  .botao-ordem:hover{background:var(--linha-papel);}
+  .botao-ordem:disabled{opacity:.35;cursor:default;}
+
+  .linha-campos-personalizado-config{
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+    margin-bottom:8px;
+  }
+  .campo-mini{
+    flex:1;
+    min-width:130px;
+  }
+  .campo-mini label{
+    display:block;
+    font-family:var(--fonte-mono);
+    font-size:10.5px;
+    letter-spacing:.04em;
+    text-transform:uppercase;
+    color:var(--tinta-suave);
+    margin-bottom:4px;
+  }
+  .campo-mini input, .campo-mini select{
+    width:100%;
+    padding:7px 8px;
+    border:1px solid var(--borda);
+    border-radius:2px;
+    background:var(--fundo-input);
+    font-family:var(--fonte-mono);
+    font-size:12.5px;
+    color:var(--tinta);
+  }
+  .cartao-campo-personalizado details{
+    margin-top:6px;
+    border-top:1px dashed var(--borda);
+    padding-top:8px;
+  }
+  .cartao-campo-personalizado summary{
+    cursor:pointer;
+    font-family:var(--fonte-mono);
+    font-size:11.5px;
+    letter-spacing:.03em;
+    text-transform:uppercase;
+    color:var(--cobre-escuro);
+    margin-bottom:6px;
+  }
+  .campo-erro-formula{margin-top:6px;}
+  .botao-remover{
+    border:1px solid var(--perigo);
+    background:transparent;
+    color:var(--perigo);
+    font-family:var(--fonte-mono);
+    font-size:12px;
+    padding:6px 10px;
+    border-radius:2px;
+    cursor:pointer;
+    white-space:nowrap;
+  }
+  .botao-remover:hover{background:var(--perigo);color:#fff;}
+  .sem-campos{
+    font-size:13px;
+    color:var(--tinta-suave);
+    font-style:italic;
+    margin-bottom:10px;
+  }
+
+  .painel-busca{
+    display:flex;
+    border:2px solid var(--tinta);
+    background:var(--cartao);
+    border-radius:2px;
+    overflow:hidden;
+    margin-bottom:8px;
+  }
+  .painel-busca input{
+    flex:1;
+    border:none;
+    background:transparent;
+    padding:12px 14px;
+    font-family:var(--fonte-mono);
+    font-size:14px;
+    color:var(--tinta);
+    outline:none;
+  }
+  .painel-busca input::placeholder{color:var(--placeholder);}
+  .painel-busca button{
+    border:none;
+    border-left:2px solid var(--tinta);
+    background:var(--cobre);
+    color:#fff;
+    font-family:var(--fonte-titulo);
+    font-weight:500;
+    letter-spacing:.04em;
+    text-transform:uppercase;
+    font-size:13px;
+    padding:0 18px;
+    cursor:pointer;
+  }
+  .painel-busca button:hover{background:var(--cobre-escuro);}
+  .botao-limpar{
+    border-left:1px solid var(--borda) !important;
+    background:transparent !important;
+    color:var(--tinta-suave) !important;
+    font-family:var(--fonte-mono) !important;
+    text-transform:none !important;
+    font-size:12px !important;
+    padding:0 14px !important;
+  }
+  .botao-limpar:hover{background:var(--linha-papel) !important;}
+
+  .linha-status{
+    font-family:var(--fonte-mono);
+    font-size:12px;
+    color:var(--tinta-suave);
+    margin:10px 2px 14px;
+    display:flex;
+    justify-content:space-between;
+    flex-wrap:wrap;
+    gap:6px;
+  }
+  .linha-status b{color:var(--cobre-escuro);}
+
+  table{
+    width:100%;
+    border-collapse:collapse;
+    background:var(--cartao);
+    border:1px solid var(--borda);
+  }
+  thead th{
+    text-align:left;
+    font-family:var(--fonte-mono);
+    font-size:11px;
+    letter-spacing:.07em;
+    text-transform:uppercase;
+    color:var(--tinta-suave);
+    background:var(--papel);
+    padding:10px 14px;
+    border-bottom:2px solid var(--tinta);
+    white-space:nowrap;
+  }
+  thead th.numero{text-align:right;}
+  tbody td{
+    padding:10px 14px;
+    border-bottom:1px solid var(--linha-papel);
+    font-size:14px;
+  }
+  tbody tr:hover{background:var(--sabia-bg);}
+  td.numero{
+    font-family:var(--fonte-mono);
+    text-align:right;
+    white-space:nowrap;
+  }
+  td.valor-destaque{font-weight:600;color:var(--sabia);}
+  mark{background:var(--destaque-busca);color:var(--destaque-busca-texto);padding:0 1px;border-radius:2px;}
+
+  .vazio{
+    text-align:center;
+    padding:40px 20px;
+    color:var(--tinta-suave);
+    font-family:var(--fonte-mono);
+    font-size:13px;
+    background:var(--cartao);
+    border:1px dashed var(--borda);
+  }
+  .oculto{display:none !important;}
+  .mensagem-erro{
+    color:var(--perigo);
+    font-family:var(--fonte-mono);
+    font-size:12px;
+    margin-top:8px;
+  }
+  .dica{
+    font-size:12px;
+    color:var(--tinta-suave);
+    margin-top:6px;
+  }
+  @media (max-width:560px){
+    h1{font-size:20px;}
+    thead th, tbody td{padding:8px;font-size:12.5px;}
+  }
+
+  #botao-tema{
+    position:fixed;
+    top:16px;
+    right:16px;
+    z-index:50;
+    padding:9px 16px;
+    font-size:12px;
+  }
+  @media (max-width:560px){
+    #botao-tema{top:8px;right:8px;padding:7px 12px;font-size:11px;}
+  }
+
+  /* painel de aparencia (details recolhivel) */
+  #painel-aparencia summary{
+    cursor:pointer;
+    font-family:var(--fonte-titulo);
+    text-transform:uppercase;
+    font-size:14px;
+    letter-spacing:.06em;
+    font-weight:600;
+    color:var(--tinta);
+    border-bottom:1px solid var(--linha-papel);
+    padding-bottom:8px;
+    margin-bottom:2px;
+  }
+  #painel-aparencia[open] summary{margin-bottom:14px;}
+  #painel-aparencia summary::marker{color:var(--cobre);}
+
+  /* densidade compacta da tabela (alternada pelo select de aparencia) */
+  body.densidade-compacta thead th, body.densidade-compacta tbody td{
+    padding:6px 10px;
+    font-size:12.5px;
+  }
+
+  /* faixas de valor reaproveitam o mesmo visual dos campos personalizados (ver regra combinada acima) */
+  .campo-checkbox{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    font-size:12px;
+    color:var(--tinta-suave);
+    white-space:nowrap;
+    padding-top:22px;
+  }
+  .campo-checkbox input{accent-color:var(--cobre);}
+
+  /* botao de copiar dentro do grid */
+  td.acao{text-align:center;white-space:nowrap;}
+  .botao-copiar{
+    border:1px solid var(--borda);
+    background:var(--fundo-input);
+    color:var(--tinta-suave);
+    font-size:12px;
+    padding:5px 10px;
+    border-radius:2px;
+    cursor:pointer;
+    font-family:var(--fonte-mono);
+  }
+  .botao-copiar:hover{border-color:var(--cobre);color:var(--cobre-escuro);}
+  .botao-copiar.copiado{border-color:var(--sabia);color:var(--sabia);background:var(--sabia-bg);}
+
+  /* barra de rolagem acompanhando o tema */
+  html{scrollbar-color:var(--borda) var(--papel);scrollbar-width:thin;}
+  ::-webkit-scrollbar{width:11px;height:11px;}
+  ::-webkit-scrollbar-track{background:var(--papel);}
+  ::-webkit-scrollbar-thumb{background:var(--borda);border-radius:6px;border:2px solid var(--papel);}
+  ::-webkit-scrollbar-thumb:hover{background:var(--cobre);}
+
+  /* tabela com rolagem horizontal em telas pequenas */
+  .tabela-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+
+  /* ===================== favoritos ===================== */
+  .linha-filtros{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    flex-wrap:wrap;
+    gap:10px;
+    margin-bottom:10px;
+  }
+  .grupo-filtros-favoritos{
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+  }
+  .filtro-favoritos{
+    display:flex;
+    align-items:center;
+    gap:7px;
+    font-family:var(--fonte-mono);
+    font-size:12.5px;
+    color:var(--tinta);
+    cursor:pointer;
+    user-select:none;
+  }
+  .filtro-favoritos input{accent-color:var(--cobre);}
+  .filtro-favoritos:has(input:disabled){opacity:.45;cursor:default;}
+  .estrela-rotulo{color:var(--cobre);}
+
+  .badge-contador{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    min-width:18px;
+    height:18px;
+    padding:0 5px;
+    margin-left:8px;
+    border-radius:9px;
+    background:var(--cobre);
+    color:#fff;
+    font-size:11px;
+    font-family:var(--fonte-mono);
+    font-weight:600;
+  }
+
+  .col-fav{text-align:center;width:34px;}
+  .botao-favorito{
+    border:none;
+    background:transparent;
+    cursor:pointer;
+    font-size:18px;
+    line-height:1;
+    color:var(--borda);
+    padding:2px 4px;
+    transition:color .15s ease, transform .1s ease;
+  }
+  .botao-favorito:hover{color:var(--cobre);transform:scale(1.15);}
+  .botao-favorito.favorito-ativo{color:var(--cobre);}
+
+  td.acao{text-align:center;white-space:nowrap;}
+  td.acao > *{margin:2px 3px;}
+  .botao-add-calc{
+    border:1px solid var(--borda);
+    background:var(--fundo-input);
+    color:var(--tinta-suave);
+    font-size:12px;
+    padding:5px 10px;
+    border-radius:2px;
+    cursor:pointer;
+    font-family:var(--fonte-mono);
+  }
+  .botao-add-calc:hover{border-color:var(--sabia);color:var(--sabia);}
+  .botao-add-calc.adicionado{border-color:var(--sabia);color:var(--sabia);background:var(--sabia-bg);}
+
+  /* ===================== calculadora de orcamento ===================== */
+  /* agora fica acima da tabela (perto da busca/filtros) em vez de um painel separado no rodape */
+  .bloco-calculadora{
+    background:var(--papel);
+    border:1px solid var(--linha-papel);
+    border-radius:2px;
+    padding:16px 18px;
+    margin-bottom:14px;
+  }
+  .bloco-calculadora h3{
+    font-family:var(--fonte-titulo);
+    text-transform:uppercase;
+    font-size:12.5px;
+    letter-spacing:.05em;
+    font-weight:600;
+    margin:0 0 12px;
+    color:var(--cobre-escuro);
+  }
+  #painel-calculadora .tabela-calculadora{
+    width:100%;
+    border-collapse:collapse;
+    background:var(--cartao);
+    border:1px solid var(--borda);
+    margin-bottom:14px;
+  }
+  #painel-calculadora .tabela-calculadora th{
+    text-align:left;
+    font-family:var(--fonte-mono);
+    font-size:11px;
+    letter-spacing:.07em;
+    text-transform:uppercase;
+    color:var(--tinta-suave);
+    background:var(--papel);
+    padding:9px 12px;
+    border-bottom:2px solid var(--tinta);
+    white-space:nowrap;
+  }
+  #painel-calculadora .tabela-calculadora th.numero{text-align:right;}
+  #painel-calculadora .tabela-calculadora th.acao-col{text-align:center;}
+  #painel-calculadora .tabela-calculadora td{
+    padding:8px 12px;
+    border-bottom:1px solid var(--linha-papel);
+    font-size:13.5px;
+  }
+  #painel-calculadora .tabela-calculadora td.numero{
+    font-family:var(--fonte-mono);
+    text-align:right;
+    white-space:nowrap;
+  }
+  #painel-calculadora .tabela-calculadora td.numero.subtotal-calc{font-weight:600;color:var(--sabia);}
+  .controle-quantidade{
+    display:flex;
+    align-items:center;
+    gap:5px;
+    justify-content:center;
+  }
+  .botao-qtd{
+    width:26px;
+    height:26px;
+    border:1px solid var(--borda);
+    background:var(--fundo-input);
+    color:var(--tinta);
+    border-radius:2px;
+    cursor:pointer;
+    font-family:var(--fonte-mono);
+    font-size:14px;
+    line-height:1;
+  }
+  .botao-qtd:hover{background:var(--linha-papel);border-color:var(--cobre);}
+  .input-quantidade{
+    width:50px;
+    text-align:center;
+    padding:5px 4px;
+    border:1px solid var(--borda);
+    border-radius:2px;
+    background:var(--fundo-input);
+    color:var(--tinta);
+    font-family:var(--fonte-mono);
+    font-size:13px;
+  }
+  .input-quantidade:focus{outline:none;border-color:var(--cobre);}
+  .botao-remover-calc{
+    border:1px solid var(--perigo);
+    background:transparent;
+    color:var(--perigo);
+    width:26px;
+    height:26px;
+    border-radius:2px;
+    cursor:pointer;
+    font-size:12px;
+    line-height:1;
+  }
+  .botao-remover-calc:hover{background:var(--perigo);color:#fff;}
+  .linha-total-calculadora{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:12px 16px;
+    background:var(--sabia-bg);
+    border:1px solid var(--sabia);
+    border-radius:2px;
+    font-family:var(--fonte-titulo);
+    text-transform:uppercase;
+    letter-spacing:.04em;
+    font-size:13px;
+    color:var(--tinta);
+  }
+  .linha-total-calculadora b{
+    font-family:var(--fonte-mono);
+    font-size:19px;
+    color:var(--sabia);
+    letter-spacing:0;
+  }
+
+  @media (max-width:560px){
+    .linha-filtros{flex-direction:column;align-items:stretch;}
+    #painel-calculadora .tabela-calculadora th, #painel-calculadora .tabela-calculadora td{padding:6px 8px;font-size:12px;}
+    .input-quantidade{width:40px;}
+    .botao-qtd, .botao-remover-calc{width:24px;height:24px;}
+  }
+</style>
+<script>
+/* ===================== aparencia: aplicacao antecipada (evita "flash" de tema errado) ===================== */
+(function(){
+  var raiz = document.documentElement;
+
+  // combinacoes de fonte disponiveis no painel de aparencia
+  window.combosFonteAparencia = {
+    padrao:      { titulo:"'Oswald', sans-serif",   mono:"'IBM Plex Mono', monospace",          corpo:"'Inter', sans-serif" },
+    classica:    { titulo:"Georgia, serif",          mono:"'Courier New', monospace",             corpo:"Georgia, serif" },
+    moderna:     { titulo:"Verdana, sans-serif",     mono:"Consolas, 'Courier New', monospace",   corpo:"Verdana, sans-serif" },
+    minimalista: { titulo:"Arial, sans-serif",       mono:"Arial, sans-serif",                    corpo:"Arial, sans-serif" }
+  };
+
+  // escurece uma cor hex (#rrggbb) em uma fracao 0-1, usada para gerar o tom "escuro" do destaque customizado
+  window.escurecerCorAparencia = function(hex, quantidade){
+    var limpo = String(hex || '').replace('#', '');
+    if(!/^[0-9a-fA-F]{6}$/.test(limpo)) return hex;
+    var num = parseInt(limpo, 16);
+    var r = (num >> 16) - Math.round(255 * quantidade);
+    var g = ((num >> 8) & 0x00FF) - Math.round(255 * quantidade);
+    var b = (num & 0x0000FF) - Math.round(255 * quantidade);
+    r = Math.max(0, Math.min(255, r));
+    g = Math.max(0, Math.min(255, g));
+    b = Math.max(0, Math.min(255, b));
+    return '#' + [r, g, b].map(function(v){ return v.toString(16).padStart(2, '0'); }).join('');
+  };
+
+  // aplica toda a configuracao de aparencia num elemento raiz (documentElement) - reaproveitada no carregamento e nas trocas
+  window.aplicarAparenciaNoElemento = function(cfg, alvo){
+    if(cfg.tema === 'escuro'){ alvo.dataset.tema = 'escuro'; }
+    else { delete alvo.dataset.tema; }
+
+    var combo = window.combosFonteAparencia[cfg.fonte] || window.combosFonteAparencia.padrao;
+    alvo.style.setProperty('--fonte-titulo', combo.titulo);
+    alvo.style.setProperty('--fonte-mono', combo.mono);
+    alvo.style.setProperty('--fonte-corpo', combo.corpo);
+
+    if(cfg.corDestaque){
+      alvo.style.setProperty('--cobre', cfg.corDestaque);
+      alvo.style.setProperty('--cobre-escuro', window.escurecerCorAparencia(cfg.corDestaque, 0.15));
+    } else {
+      alvo.style.removeProperty('--cobre');
+      alvo.style.removeProperty('--cobre-escuro');
+    }
+
+    if(cfg.corAjuste){
+      alvo.style.setProperty('--sabia', cfg.corAjuste);
+    } else {
+      alvo.style.removeProperty('--sabia');
+    }
+
+    alvo.style.setProperty('--largura-conteudo', cfg.largura || '980px');
+  };
+
+  try{
+    var bruto = localStorage.getItem('aparencia_config_v1');
+    var cfg = bruto ? JSON.parse(bruto) : null;
+    if(cfg && typeof cfg === 'object'){
+      window.aplicarAparenciaNoElemento(cfg, raiz);
+      window.configAparenciaCarregadaCedo = cfg;
+    }
+  }catch(e){ /* localStorage indisponivel ou config corrompida: mantem o padrao visual */ }
+})();
+</script>
+</head>
+<body>
+<script>
+// aplica a densidade da tabela (compacta/confortavel) assim que o <body> existe, antes do conteudo aparecer
+(function(){
+  try{
+    var cfg = window.configAparenciaCarregadaCedo;
+    if(cfg && cfg.densidade === 'compacta'){
+      document.body.classList.add('densidade-compacta');
+    }
+  }catch(e){}
+})();
+</script>
+<button id="botao-tema" class="botao secundario" type="button" title="Alternar entre modo claro e escuro">Modo escuro</button>
+<div class="conteiner">
+
+  <div class="bloco-titulo">
+    <p class="rotulo">Ferramenta local · nada é enviado para nenhum servidor</p>
+    <h1>Valor conta &amp; valor ajuste</h1>
+    <div class="linha-meta">
+      Carregue uma tabela em CSV, Excel (.xlsx/.xls) ou PDF com as colunas <b>produto</b> e <b>valor</b>.
+      A ferramenta cria as colunas <b>valor conta</b> e <b>valor ajuste</b> (fórmulas e arredondamento configuráveis)
+      e ainda permite adicionar outros campos calculados por conta própria.
+    </div>
+  </div>
+
+  <details class="painel" id="painel-aparencia">
+    <summary>Aparência (opcional)</summary>
+    <div class="linha-campos">
+      <div class="campo">
+        <label>Combinação de fontes</label>
+        <select id="config-fonte">
+          <option value="padrao">Padrão (Oswald + IBM Plex Mono)</option>
+          <option value="classica">Clássica (Georgia + Courier New)</option>
+          <option value="moderna">Moderna (Verdana + Consolas)</option>
+          <option value="minimalista">Minimalista (Arial)</option>
+        </select>
+      </div>
+      <div class="campo">
+        <label>Cor de destaque (botões)</label>
+        <input type="color" id="config-cor-destaque" value="#b5652d">
+      </div>
+      <div class="campo">
+        <label>Cor do valor ajuste</label>
+        <input type="color" id="config-cor-ajuste" value="#4b6350">
+      </div>
+      <div class="campo">
+        <label>Largura do conteúdo</label>
+        <select id="config-largura">
+          <option value="980px">Padrão</option>
+          <option value="1200px">Largo</option>
+          <option value="100%">Tela cheia</option>
+        </select>
+      </div>
+      <div class="campo">
+        <label>Densidade da tabela</label>
+        <select id="config-densidade">
+          <option value="confortavel">Confortável</option>
+          <option value="compacta">Compacta</option>
+        </select>
+      </div>
+    </div>
+    <div class="dica">Essas opções mudam só a aparência da ferramenta — não afetam nenhum cálculo.</div>
+  </details>
+
+  <div class="painel">
+    <h2>1. Carregar arquivo</h2>
+    <div class="area-soltar" id="area-soltar">
+      <div>Arraste o arquivo aqui, ou <strong>clique para escolher</strong></div>
+      <div class="dica">Formatos aceitos: .csv, .xlsx, .xls e .pdf — de qualquer pasta do computador, inclusive a mesma pasta deste HTML.</div>
+      <input type="file" id="entrada-arquivo" accept=".csv,.txt,.xlsx,.xls,.pdf">
+    </div>
+    <div class="info-arquivo oculto" id="info-arquivo"></div>
+    <div class="mensagem-erro oculto" id="erro-arquivo"></div>
+
+    <div id="secao-planilha" class="oculto" style="margin-top:14px;">
+      <div class="campo" style="max-width:280px;">
+        <label>Planilha</label>
+        <select id="selecao-planilha"></select>
+      </div>
+    </div>
+
+    <div id="secao-mapeamento" class="oculto" style="margin-top:16px;">
+      <div class="linha-campos">
+        <div class="campo">
+          <label>Coluna do produto</label>
+          <select id="coluna-produto"></select>
+        </div>
+        <div class="campo">
+          <label>Coluna do valor</label>
+          <select id="coluna-valor"></select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="painel oculto" id="painel-config">
+    <h2>2. Regras de cálculo</h2>
+    <div class="grupo-opcoes">
+      <label><input type="radio" name="modo-calculo" value="unico" checked> Regra única para todos os produtos</label>
+      <label><input type="radio" name="modo-calculo" value="faixas"> Regras diferentes por faixa de valor</label>
+    </div>
+
+    <div id="secao-faixas" class="oculto" style="margin:14px 0;">
+      <div id="lista-faixas"></div>
+      <div class="sem-campos" id="aviso-sem-faixas">Nenhuma faixa adicionada ainda — a regra padrão abaixo vale para todos os produtos.</div>
+      <div class="linha-botoes">
+        <button class="botao secundario" id="botao-add-faixa" type="button">+ Adicionar faixa de valor</button>
+      </div>
+      <div class="dica">
+        Cada faixa vale para produtos cujo <code>valor</code> caia no intervalo definido (primeira faixa que bater é usada).
+        Produtos fora de todas as faixas caem na "regra padrão" logo abaixo.
+      </div>
+    </div>
+
+    <h3 id="rotulo-regra-padrao-conta" style="margin-top:18px;">Valor conta</h3>
+    <div class="grupo-opcoes">
+      <label><input type="radio" name="conta-tipo" value="percentual" checked> Acréscimo percentual</label>
+      <label><input type="radio" name="conta-tipo" value="multiplicador"> Multiplicador</label>
+      <label><input type="radio" name="conta-tipo" value="formula"> Fórmula personalizada</label>
+    </div>
+    <div class="linha-campos" id="campos-conta-percentual">
+      <div class="campo">
+        <label>Percentual de acréscimo (%)</label>
+        <input type="number" id="conta-pct" value="50" step="1">
+      </div>
+    </div>
+    <div class="linha-campos oculto" id="campos-conta-mult">
+      <div class="campo">
+        <label>Multiplicador</label>
+        <input type="number" id="conta-mult" value="1.5" step="0.01">
+      </div>
+    </div>
+    <div class="linha-campos oculto" id="campos-conta-formula">
+      <div class="campo" style="flex:2;">
+        <label>Fórmula (use "valor" como variável)</label>
+        <input type="text" id="conta-formula" value="valor * 1.5">
+      </div>
+    </div>
+    <div class="dica">Exemplos de fórmula: <code>valor * 1.5</code> · <code>valor * 1.2 + 10</code> · <code>(valor + 20) * 1.3</code></div>
+
+    <h3 id="rotulo-regra-padrao-ajuste" style="margin-top:20px;">Valor ajuste</h3>
+    <div class="grupo-opcoes">
+      <label><input type="radio" name="ajuste-tipo" value="digito" checked> Terminar em dígito específico</label>
+      <label><input type="radio" name="ajuste-tipo" value="multiplo"> Múltiplo de um valor</label>
+      <label><input type="radio" name="ajuste-tipo" value="decimais"> Arredondar casas decimais</label>
+    </div>
+    <div class="linha-campos" id="campos-ajuste-digito">
+      <div class="campo">
+        <label>Dígito final desejado (0-9)</label>
+        <input type="number" id="ajuste-digito" value="9" min="0" max="9" step="1">
+      </div>
+      <div class="campo">
+        <label>Direção do arredondamento</label>
+        <select id="ajuste-digito-dir">
+          <option value="cima">Para cima</option>
+          <option value="baixo">Para baixo</option>
+          <option value="proximo">Mais próximo</option>
+        </select>
+      </div>
+    </div>
+    <div class="linha-campos oculto" id="campos-ajuste-multiplo">
+      <div class="campo">
+        <label>Múltiplo de</label>
+        <input type="number" id="ajuste-multiplo" value="10" step="0.01">
+      </div>
+      <div class="campo">
+        <label>Direção do arredondamento</label>
+        <select id="ajuste-multiplo-dir">
+          <option value="cima">Para cima</option>
+          <option value="baixo">Para baixo</option>
+          <option value="proximo">Mais próximo</option>
+        </select>
+      </div>
+    </div>
+    <div class="linha-campos oculto" id="campos-ajuste-decimais">
+      <div class="campo">
+        <label>Casas decimais</label>
+        <input type="number" id="ajuste-decimais" value="2" min="0" max="4" step="1">
+      </div>
+      <div class="campo">
+        <label>Direção do arredondamento</label>
+        <select id="ajuste-decimais-dir">
+          <option value="proximo">Mais próximo</option>
+          <option value="cima">Para cima</option>
+          <option value="baixo">Para baixo</option>
+        </select>
+      </div>
+    </div>
+
+    <h2 style="margin-top:20px;">3. Formatação de exibição (valor ajuste)</h2>
+    <div class="linha-campos">
+      <div class="campo">
+        <label>Casas decimais exibidas</label>
+        <input type="number" id="fmt-decimais" value="2" min="0" max="4" step="1">
+      </div>
+      <div class="campo">
+        <label>Separador decimal</label>
+        <select id="fmt-dec-sep">
+          <option value=",">Vírgula (1234,56)</option>
+          <option value=".">Ponto (1234.56)</option>
+        </select>
+      </div>
+      <div class="campo">
+        <label>Separador de milhar</label>
+        <select id="fmt-mil-sep">
+          <option value="">Nenhum (1234,56)</option>
+          <option value=".">Ponto (1.234,56)</option>
+          <option value=",">Vírgula (1,234.56)</option>
+        </select>
+      </div>
+      <div class="campo">
+        <label>Prefixo</label>
+        <select id="fmt-prefix">
+          <option value="">Nenhum</option>
+          <option value="R$">R$</option>
+        </select>
+      </div>
+    </div>
+
+    <h2 style="margin-top:20px;">4. Campos personalizados (opcional)</h2>
+    <div id="lista-campos-personalizados"></div>
+    <div class="sem-campos" id="aviso-sem-campos">Nenhum campo personalizado adicionado ainda.</div>
+    <div class="linha-botoes">
+      <button class="botao secundario" id="botao-add-campo" type="button">+ Adicionar campo</button>
+    </div>
+    <div class="dica">
+      Cada campo pode ser baseado em valor, valor conta, valor ajuste ou em outro campo personalizado já criado acima dele.
+      Tem 5 tipos de cálculo (percentual, multiplicador, soma fixa, subtração fixa ou fórmula livre com <code>valor</code>,
+      <code>conta</code>, <code>ajuste</code> e <code>base</code>), arredondamento próprio opcional e formatação de exibição própria
+      (casas decimais, separadores, prefixo e sufixo). Use as setas para reordenar — a ordem importa quando um campo depende de outro.
+    </div>
+
+    <div class="linha-botoes" style="margin-top:20px;">
+      <button class="botao" id="botao-aplicar">Aplicar e gerar tabela</button>
+    </div>
+  </div>
+
+  <div class="painel oculto" id="painel-resultado">
+    <h2>5. Tabela</h2>
+    <div class="painel-busca">
+      <input type="text" id="entrada-busca" placeholder="Pesquisar produto..." autocomplete="off">
+      <button id="botao-limpar-busca" class="botao-limpar">Limpar</button>
+      <button id="botao-buscar">Pesquisar</button>
+    </div>
+    <div class="linha-filtros">
+      <div class="grupo-filtros-favoritos">
+        <label class="filtro-favoritos" for="filtro-apenas-favoritos">
+          <input type="checkbox" id="filtro-apenas-favoritos">
+          <span class="estrela-rotulo">★</span> Mostrar apenas favoritos
+        </label>
+        <label class="filtro-favoritos" for="filtro-favoritos-junto">
+          <input type="checkbox" id="filtro-favoritos-junto">
+          <span class="estrela-rotulo">★</span> Mostrar favoritos junto à lista
+        </label>
+      </div>
+      <button class="botao secundario" id="botao-calculadora" type="button">
+        Calculadora de orçamento<span class="badge-contador oculto" id="badge-calculadora">0</span>
+      </button>
+    </div>
+
+    <div class="bloco-calculadora oculto" id="painel-calculadora">
+      <h3>Calculadora de orçamento</h3>
+      <div id="lista-calculadora"></div>
+      <div class="vazio oculto" id="calculadora-vazia">
+        Nenhum item adicionado ainda. Use o botão <b>+ Orçamento</b> na tabela de produtos.
+      </div>
+      <div class="linha-total-calculadora">
+        <span>Total geral do orçamento</span>
+        <b id="total-calculadora">R$ 0,00</b>
+      </div>
+      <div class="linha-botoes" style="margin-top:14px;">
+        <button class="botao secundario" id="botao-limpar-calculadora" type="button">Limpar calculadora</button>
+      </div>
+    </div>
+
+    <div class="linha-status">
+      <span id="texto-status">Mostrando todos os produtos</span>
+      <span id="contagem-status"></span>
+    </div>
+    <div class="tabela-scroll">
+      <table id="tabela-resultado">
+        <thead id="cabecalho-tabela"></thead>
+        <tbody id="corpo-tabela"></tbody>
+      </table>
+    </div>
+    <div class="vazio oculto" id="estado-vazio">Nenhum produto encontrado para essa pesquisa.</div>
+
+    <div class="linha-botoes" style="margin-top:16px;">
+      <div class="campo" style="max-width:200px;">
+        <label>Formato do arquivo</label>
+        <select id="formato-exportacao">
+          <option value="csv">CSV</option>
+          <option value="xlsx">Excel (.xlsx)</option>
+          <option value="pdf">PDF</option>
+        </select>
+      </div>
+      <button class="botao secundario" id="botao-baixar" style="align-self:flex-end;">Baixar resultado</button>
+    </div>
+    <div class="dica">O download considera apenas o que está sendo exibido na tabela — se você pesquisou algo, só o filtrado é exportado.</div>
+  </div>
+
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+
+<script>
+if(typeof pdfjsLib !== 'undefined'){
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+}
+
+/* ===================== estado global ===================== */
+let cabecalhosArquivo = [];   // nomes das colunas do arquivo carregado
+let linhasBrutas = [];        // linhas de dados (arrays de string), sem cabecalho
+let workbookAtual = null;     // planilha excel carregada, se for o caso
+let resultados = [];          // linhas ja calculadas (produto, valor, conta, ajuste, extras)
+let resultadosVisiveis = [];  // o que esta na tela agora (considera a busca) -> usado na exportacao
+let ultimosCamposPersonalizados = []; // config dos campos extras usada no ultimo "aplicar"
+let contadorCampos = 0;
+let termoBuscaAtual = '';            // ultimo termo de busca usado (para re-render ao favoritar/filtrar)
+let listaRenderizadaAtual = [];      // lista de produtos exibida agora na tabela (para localizar por indice nos cliques)
+let itensCalculadora = [];           // itens da calculadora de orcamento: { produto, valorUnitario, valorUnitarioTexto, quantidade }
+
+/* ===================== elementos ===================== */
+const areaSoltar = document.getElementById('area-soltar');
+const entradaArquivo = document.getElementById('entrada-arquivo');
+const infoArquivo = document.getElementById('info-arquivo');
+const erroArquivo = document.getElementById('erro-arquivo');
+const secaoPlanilha = document.getElementById('secao-planilha');
+const selecaoPlanilha = document.getElementById('selecao-planilha');
+const secaoMapeamento = document.getElementById('secao-mapeamento');
+const colunaProdutoSel = document.getElementById('coluna-produto');
+const colunaValorSel = document.getElementById('coluna-valor');
+const painelConfig = document.getElementById('painel-config');
+const painelResultado = document.getElementById('painel-resultado');
+
+/* ===================== aparencia (tema, fontes, cores, largura, densidade) =====================
+   Tudo aqui e' persistido em localStorage e aplicado instantaneamente, sem precisar recarregar.
+   A aplicacao "antecipada" (contra flash de tema errado) ja aconteceu no <head>/inicio do <body>;
+   aqui a gente garante consistencia total, sincroniza os controles do painel e liga os eventos. */
+const CHAVE_APARENCIA = 'aparencia_config_v1';
+const APARENCIA_PADRAO = {
+  tema: 'claro',
+  fonte: 'padrao',
+  corDestaque: null,   // null = usa a cor padrao do tema atual
+  corAjuste: null,     // null = usa a cor padrao do tema atual
+  largura: '980px',
+  densidade: 'confortavel'
+};
+
+const botaoTema = document.getElementById('botao-tema');
+let configAparencia = Object.assign({}, APARENCIA_PADRAO, window.configAparenciaCarregadaCedo || {});
+
+function salvarConfigAparencia(){
+  try{ localStorage.setItem(CHAVE_APARENCIA, JSON.stringify(configAparencia)); }
+  catch(e){ /* localStorage indisponivel (modo privado, por exemplo): a aparencia so nao persiste */ }
+}
+
+function aplicarConfigAparencia(){
+  window.aplicarAparenciaNoElemento(configAparencia, document.documentElement);
+  document.body.classList.toggle('densidade-compacta', configAparencia.densidade === 'compacta');
+  botaoTema.textContent = configAparencia.tema === 'escuro' ? 'Modo claro' : 'Modo escuro';
+}
+
+// mantem os controles do painel "Aparencia" mostrando o estado atual (inclusive a cor "efetiva" do tema quando nao customizada)
+function sincronizarControlesDeAparencia(){
+  const corDestaqueEfetiva = configAparencia.corDestaque ||
+    getComputedStyle(document.documentElement).getPropertyValue('--cobre').trim() || '#b5652d';
+  const corAjusteEfetiva = configAparencia.corAjuste ||
+    getComputedStyle(document.documentElement).getPropertyValue('--sabia').trim() || '#4b6350';
+
+  document.getElementById('config-fonte').value = configAparencia.fonte;
+  document.getElementById('config-cor-destaque').value = corDestaqueEfetiva;
+  document.getElementById('config-cor-ajuste').value = corAjusteEfetiva;
+  document.getElementById('config-largura').value = configAparencia.largura;
+  document.getElementById('config-densidade').value = configAparencia.densidade;
+}
+
+function atualizarAparencia(alteracoes){
+  Object.assign(configAparencia, alteracoes);
+  aplicarConfigAparencia();
+  salvarConfigAparencia();
+}
+
+botaoTema.addEventListener('click', () => {
+  atualizarAparencia({ tema: configAparencia.tema === 'escuro' ? 'claro' : 'escuro' });
+  sincronizarControlesDeAparencia(); // as cores "efetivas" (quando nao customizadas) mudam com o tema
+});
+
+document.getElementById('config-fonte').addEventListener('change', e => {
+  atualizarAparencia({ fonte: e.target.value });
+});
+document.getElementById('config-cor-destaque').addEventListener('input', e => {
+  atualizarAparencia({ corDestaque: e.target.value });
+});
+document.getElementById('config-cor-ajuste').addEventListener('input', e => {
+  atualizarAparencia({ corAjuste: e.target.value });
+});
+document.getElementById('config-largura').addEventListener('change', e => {
+  atualizarAparencia({ largura: e.target.value });
+});
+document.getElementById('config-densidade').addEventListener('change', e => {
+  atualizarAparencia({ densidade: e.target.value });
+});
+
+// aplica no carregamento e sincroniza os controles do painel de aparencia com o estado restaurado
+aplicarConfigAparencia();
+sincronizarControlesDeAparencia();
+
+
+/* ===================== favoritos ===================== */
+const CHAVE_FAVORITOS = 'favoritos_produtos_v1';
+
+function carregarFavoritos(){
+  try{
+    const bruto = localStorage.getItem(CHAVE_FAVORITOS);
+    const arr = bruto ? JSON.parse(bruto) : [];
+    return new Set(Array.isArray(arr) ? arr : []);
+  }catch(e){ return new Set(); }
+}
+function salvarFavoritos(){
+  try{ localStorage.setItem(CHAVE_FAVORITOS, JSON.stringify(Array.from(favoritos))); }
+  catch(e){ /* localStorage indisponivel: os favoritos so nao persistem entre sessoes */ }
+}
+function alternarFavorito(produto){
+  if(favoritos.has(produto)) favoritos.delete(produto);
+  else favoritos.add(produto);
+  salvarFavoritos();
+}
+
+const favoritos = carregarFavoritos();
+
+/* ===================== carregamento do arquivo ===================== */
+
+areaSoltar.addEventListener('click', () => entradaArquivo.click());
+areaSoltar.addEventListener('dragover', e => { e.preventDefault(); areaSoltar.classList.add('arrastando'); });
+areaSoltar.addEventListener('dragleave', () => areaSoltar.classList.remove('arrastando'));
+areaSoltar.addEventListener('drop', e => {
+  e.preventDefault();
+  areaSoltar.classList.remove('arrastando');
+  if(e.dataTransfer.files.length) processarArquivo(e.dataTransfer.files[0]);
+});
+entradaArquivo.addEventListener('change', e => {
+  if(e.target.files.length) processarArquivo(e.target.files[0]);
+});
+
+function lerComoTexto(file){
+  return new Promise((resolve, reject) => {
+    const leitor = new FileReader();
+    leitor.onload = e => resolve(e.target.result);
+    leitor.onerror = () => reject(new Error('Não foi possível ler o arquivo.'));
+    leitor.readAsText(file, 'UTF-8');
+  });
+}
+
+function lerComoArrayBuffer(file){
+  return new Promise((resolve, reject) => {
+    const leitor = new FileReader();
+    leitor.onload = e => resolve(e.target.result);
+    leitor.onerror = () => reject(new Error('Não foi possível ler o arquivo.'));
+    leitor.readAsArrayBuffer(file);
+  });
+}
+
+async function processarArquivo(file){
+  erroArquivo.classList.add('oculto');
+  secaoPlanilha.classList.add('oculto');
+  const nome = file.name.toLowerCase();
+
+  try{
+    if(nome.endsWith('.csv') || nome.endsWith('.txt')){
+      let texto = await lerComoTexto(file);
+      if(texto.charCodeAt(0) === 0xFEFF) texto = texto.slice(1);
+      const linhas = parseCSV(texto);
+      definirDadosBrutos(linhas);
+      infoArquivo.textContent = file.name + ' — ' + linhasBrutas.length + ' linha(s), ' + cabecalhosArquivo.length + ' coluna(s)';
+
+    } else if(nome.endsWith('.xlsx') || nome.endsWith('.xls')){
+      if(typeof XLSX === 'undefined') throw new Error('a biblioteca de Excel não carregou (verifique sua internet).');
+      const buffer = await lerComoArrayBuffer(file);
+      workbookAtual = XLSX.read(buffer, {type:'array'});
+      montarSeletorDePlanilhas();
+      carregarPlanilha(workbookAtual.SheetNames[0]);
+      infoArquivo.textContent = file.name + ' — ' + linhasBrutas.length + ' linha(s), ' + cabecalhosArquivo.length + ' coluna(s)';
+
+    } else if(nome.endsWith('.pdf')){
+      if(typeof pdfjsLib === 'undefined') throw new Error('a biblioteca de PDF não carregou (verifique sua internet).');
+      const buffer = await lerComoArrayBuffer(file);
+      const linhas = await extrairTabelaDoPDF(buffer);
+      definirDadosBrutos(linhas);
+      infoArquivo.textContent = file.name + ' — ' + linhasBrutas.length + ' linha(s) extraída(s) do PDF (aproximado, confira antes de aplicar)';
+
+    } else {
+      throw new Error('Formato não suportado. Use .csv, .xlsx, .xls ou .pdf');
+    }
+
+    infoArquivo.classList.remove('oculto');
+    popularSelecaoColunas();
+    secaoMapeamento.classList.remove('oculto');
+    painelConfig.classList.remove('oculto');
+    painelResultado.classList.add('oculto');
+
+  }catch(err){
+    erroArquivo.textContent = 'Erro ao processar o arquivo: ' + err.message;
+    erroArquivo.classList.remove('oculto');
+  }
+}
+
+function definirDadosBrutos(linhas){
+  if(!linhas || linhas.length < 2) throw new Error('não encontrei dados suficientes (preciso de um cabeçalho e ao menos uma linha).');
+  cabecalhosArquivo = linhas[0].map(h => String(h == null ? '' : h).trim());
+  linhasBrutas = linhas.slice(1)
+    .map(r => r.map(c => (c == null ? '' : String(c))))
+    .filter(r => r.some(c => c.trim() !== ''));
+}
+
+/* --- csv --- */
+function parseCSV(texto){
+  const linhas = [];
+  let i = 0, campo = '', linha = [], dentroDeAspas = false;
+  const tamanho = texto.length;
+  while(i < tamanho){
+    const c = texto[i];
+    if(dentroDeAspas){
+      if(c === '"'){
+        if(texto[i+1] === '"'){ campo += '"'; i += 2; continue; }
+        dentroDeAspas = false; i++; continue;
+      } else { campo += c; i++; continue; }
+    } else {
+      if(c === '"'){ dentroDeAspas = true; i++; continue; }
+      if(c === ','){ linha.push(campo); campo = ''; i++; continue; }
+      if(c === '\r'){ i++; continue; }
+      if(c === '\n'){ linha.push(campo); linhas.push(linha); linha = []; campo = ''; i++; continue; }
+      campo += c; i++; continue;
+    }
+  }
+  if(campo !== '' || linha.length){ linha.push(campo); linhas.push(linha); }
+  return linhas;
+}
+
+/* --- excel --- */
+function montarSeletorDePlanilhas(){
+  if(workbookAtual.SheetNames.length <= 1){
+    secaoPlanilha.classList.add('oculto');
+    return;
+  }
+  selecaoPlanilha.innerHTML = '';
+  workbookAtual.SheetNames.forEach(n => {
+    const opt = document.createElement('option');
+    opt.value = n; opt.textContent = n;
+    selecaoPlanilha.appendChild(opt);
+  });
+  secaoPlanilha.classList.remove('oculto');
+}
+selecaoPlanilha.addEventListener('change', () => {
+  carregarPlanilha(selecaoPlanilha.value);
+  popularSelecaoColunas();
+});
+function carregarPlanilha(nomePlanilha){
+  const sheet = workbookAtual.Sheets[nomePlanilha];
+  const linhas = XLSX.utils.sheet_to_json(sheet, {header:1, raw:false, defval:''});
+  definirDadosBrutos(linhas);
+}
+
+/* --- pdf (extracao aproximada, baseada em texto por linha) --- */
+async function extrairTabelaDoPDF(buffer){
+  const pdf = await pdfjsLib.getDocument({data: buffer}).promise;
+  const linhasDeTexto = [];
+  for(let p = 1; p <= pdf.numPages; p++){
+    const pagina = await pdf.getPage(p);
+    const conteudo = await pagina.getTextContent();
+    linhasDeTexto.push(...agruparItensPorLinha(conteudo.items));
+  }
+
+  const regexValorNoFim = /(\d{1,3}(?:\.\d{3})*,\d{2}|\d{1,3}(?:,\d{3})*\.\d{2}|\d+,\d{2}|\d+\.\d{2}|\d+)\s*$/;
+  const tabela = [['produto', 'valor']];
+  linhasDeTexto.forEach(linha => {
+    const texto = linha.trim();
+    if(!texto) return;
+    const m = texto.match(regexValorNoFim);
+    if(!m) return;
+    const valorTexto = m[1];
+    const produtoTexto = texto.slice(0, m.index).trim().replace(/[-–—.\s]+$/, '');
+    if(!produtoTexto) return;
+    tabela.push([produtoTexto, valorTexto]);
+  });
+
+  if(tabela.length < 2) throw new Error('não encontrei uma tabela de preços legível neste PDF.');
+  return tabela;
+}
+
+function agruparItensPorLinha(items){
+  const grupos = {};
+  items.forEach(item => {
+    const y = Math.round(item.transform[5] / 2) * 2; // agrupa posicoes proximas na mesma linha
+    if(!grupos[y]) grupos[y] = [];
+    grupos[y].push(item);
+  });
+  const posicoesY = Object.keys(grupos).map(Number).sort((a, b) => b - a);
+  return posicoesY.map(y =>
+    grupos[y].sort((a, b) => a.transform[4] - b.transform[4]).map(i => i.str).join(' ')
+  );
+}
+
+/* ===================== mapeamento de colunas ===================== */
+function normalizarTexto(h){
+  return h.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+}
+
+function popularSelecaoColunas(){
+  colunaProdutoSel.innerHTML = '';
+  colunaValorSel.innerHTML = '';
+  cabecalhosArquivo.forEach((h, idx) => {
+    const opt1 = document.createElement('option');
+    opt1.value = idx; opt1.textContent = h || '(coluna ' + (idx + 1) + ')';
+    colunaProdutoSel.appendChild(opt1);
+    const opt2 = document.createElement('option');
+    opt2.value = idx; opt2.textContent = h || '(coluna ' + (idx + 1) + ')';
+    colunaValorSel.appendChild(opt2);
+  });
+  let idxProduto = cabecalhosArquivo.findIndex(h => normalizarTexto(h).includes('produto'));
+  let idxValor = cabecalhosArquivo.findIndex(h => normalizarTexto(h).includes('valor'));
+  if(idxProduto === -1) idxProduto = 0;
+  if(idxValor === -1){
+    idxValor = cabecalhosArquivo.findIndex((h, idx) => idx !== idxProduto && /valor|preco|preço|ipi/.test(normalizarTexto(h)));
+    if(idxValor === -1) idxValor = cabecalhosArquivo.length > 1 ? 1 : 0;
+  }
+  colunaProdutoSel.value = idxProduto;
+  colunaValorSel.value = idxValor;
+}
+
+function converterParaNumero(str){
+  if(typeof str !== 'string') return NaN;
+  let s = str.trim().replace(/[^0-9.,-]/g, '');
+  if(s === '') return NaN;
+  const temVirgula = s.includes(',');
+  const temPonto = s.includes('.');
+  if(temVirgula && temPonto){
+    if(s.lastIndexOf(',') > s.lastIndexOf('.')){
+      s = s.replace(/\./g, '').replace(',', '.');
+    } else {
+      s = s.replace(/,/g, '');
+    }
+  } else if(temVirgula && !temPonto){
+    const partes = s.split(',');
+    if(partes.length === 2 && partes[1].length <= 2){
+      s = partes[0] + '.' + partes[1];
+    } else {
+      s = s.replace(/,/g, '');
+    }
+  }
+  const n = parseFloat(s);
+  return isNaN(n) ? NaN : n;
+}
+
+/* ===================== calculo de valor conta / valor ajuste ===================== */
+function obterFuncaoConta(){
+  const tipo = document.querySelector('input[name="conta-tipo"]:checked').value;
+  if(tipo === 'percentual'){
+    const pct = parseFloat(document.getElementById('conta-pct').value) || 0;
+    return v => v * (1 + pct / 100);
+  }
+  if(tipo === 'multiplicador'){
+    const mult = parseFloat(document.getElementById('conta-mult').value) || 1;
+    return v => v * mult;
+  }
+  const expressao = document.getElementById('conta-formula').value || 'valor';
+  return criarFuncaoFormula(expressao, ['valor']);
+}
+
+function obterFuncaoAjuste(){
+  const tipo = document.querySelector('input[name="ajuste-tipo"]:checked').value;
+  if(tipo === 'digito'){
+    const digito = Math.max(0, Math.min(9, parseInt(document.getElementById('ajuste-digito').value) || 0));
+    const direcao = document.getElementById('ajuste-digito-dir').value;
+    return v => {
+      let base = Math.floor(v / 10) * 10 + digito;
+      if(direcao === 'cima'){ if(base < v - 1e-9) base += 10; return base; }
+      if(direcao === 'baixo'){ if(base > v + 1e-9) base -= 10; return base; }
+      const inferior = base > v ? base - 10 : base;
+      const superior = inferior + 10;
+      return (v - inferior) <= (superior - v) ? inferior : superior;
+    };
+  }
+  if(tipo === 'multiplo'){
+    const passo = parseFloat(document.getElementById('ajuste-multiplo').value) || 1;
+    const direcao = document.getElementById('ajuste-multiplo-dir').value;
+    return v => {
+      if(direcao === 'cima') return Math.ceil(v / passo) * passo;
+      if(direcao === 'baixo') return Math.floor(v / passo) * passo;
+      return Math.round(v / passo) * passo;
+    };
+  }
+  const casas = Math.max(0, Math.min(4, parseInt(document.getElementById('ajuste-decimais').value) || 0));
+  const direcao = document.getElementById('ajuste-decimais-dir').value;
+  const fator = Math.pow(10, casas);
+  return v => {
+    if(direcao === 'cima') return Math.ceil(v * fator) / fator;
+    if(direcao === 'baixo') return Math.floor(v * fator) / fator;
+    return Math.round(v * fator) / fator;
+  };
+}
+
+// cria uma funcao a partir de uma formula digitada pelo usuario, restringindo os caracteres aceitos
+function criarFuncaoFormula(expressao, variaveis){
+  if(!/^[a-zA-Z0-9+\-*/().,\s]+$/.test(expressao)){
+    alert('Fórmula contém caracteres não permitidos. Use apenas números, letras (valor, conta, ajuste), + - * / ( ) e funções de Math.');
+    return () => NaN;
+  }
+  try{
+    const fn = new Function(...variaveis, 'return (' + expressao + ');');
+    fn(...variaveis.map(() => 1)); // testa com valores fake pra pegar erro de sintaxe cedo
+    return (...args) => {
+      try{ return fn(...args); }catch(e){ return NaN; }
+    };
+  }catch(err){
+    alert('Fórmula inválida: ' + err.message);
+    return () => NaN;
+  }
+}
+
+function formatarValorPtBr(num){
+  if(isNaN(num)) return '';
+  return num.toFixed(2).replace('.', ',');
+}
+
+function formatarComOpcoes(num, casas, sepDecimal, sepMilhar, prefixo, sufixo){
+  if(isNaN(num)) return '';
+  const fixo = num.toFixed(casas);
+  let [parteInteira, parteDecimal] = fixo.split('.');
+  let negativo = parteInteira.startsWith('-');
+  if(negativo) parteInteira = parteInteira.slice(1);
+  if(sepMilhar){
+    parteInteira = parteInteira.replace(/\B(?=(\d{3})+(?!\d))/g, sepMilhar);
+  }
+  let resultado = parteInteira + (parteDecimal ? sepDecimal + parteDecimal : '');
+  if(negativo) resultado = '-' + resultado;
+  if(prefixo) resultado = prefixo + ' ' + resultado;
+  if(sufixo) resultado = resultado + ' ' + sufixo;
+  return resultado;
+}
+
+/* ===================== campos personalizados ===================== */
+document.getElementById('botao-add-campo').addEventListener('click', adicionarLinhaDeCampoPersonalizado);
+document.getElementById('lista-campos-personalizados').addEventListener('input', e => {
+  if(e.target.classList.contains('campo-nome')) atualizarOpcoesBaseDeTodosOsCampos();
+});
+
+function adicionarLinhaDeCampoPersonalizado(){
+  contadorCampos++;
+  const meuId = String(contadorCampos);
+  const div = document.createElement('div');
+  div.className = 'cartao-campo-personalizado';
+  div.dataset.campoId = meuId;
+  div.innerHTML =
+    '<div class="linha-topo-campo">' +
+      '<input type="text" class="campo-nome" placeholder="Nome do campo" value="valor promocional">' +
+      '<div class="botoes-ordem">' +
+        '<button type="button" class="botao-ordem botao-mover-cima" title="Mover para cima">&uarr;</button>' +
+        '<button type="button" class="botao-ordem botao-mover-baixo" title="Mover para baixo">&darr;</button>' +
+      '</div>' +
+      '<button type="button" class="botao-remover">Remover</button>' +
+    '</div>' +
+
+    '<div class="linha-campos-personalizado-config">' +
+      '<div class="campo-mini">' +
+        '<label>Baseado em</label>' +
+        '<select class="campo-base"></select>' +
+      '</div>' +
+      '<div class="campo-mini">' +
+        '<label>Tipo de cálculo</label>' +
+        '<select class="campo-tipo">' +
+          '<option value="percentual">Percentual (%)</option>' +
+          '<option value="multiplicador">Multiplicador (×)</option>' +
+          '<option value="soma">Somar valor fixo (+)</option>' +
+          '<option value="subtracao">Subtrair valor fixo (−)</option>' +
+          '<option value="formula">Fórmula personalizada</option>' +
+        '</select>' +
+      '</div>' +
+      '<div class="campo-mini">' +
+        '<label class="rotulo-parametro">Percentual (%)</label>' +
+        '<input type="text" class="campo-parametro" value="-10">' +
+      '</div>' +
+    '</div>' +
+
+    '<details>' +
+      '<summary>Arredondamento (opcional)</summary>' +
+      '<div class="linha-campos-personalizado-config">' +
+        '<div class="campo-mini">' +
+          '<label>Regra</label>' +
+          '<select class="campo-arredondamento-tipo">' +
+            '<option value="nenhum">Nenhum</option>' +
+            '<option value="digito">Terminar em dígito</option>' +
+            '<option value="multiplo">Múltiplo de</option>' +
+            '<option value="decimais">Casas decimais</option>' +
+          '</select>' +
+        '</div>' +
+        '<div class="campo-mini oculto config-arred-digito">' +
+          '<label>Dígito final (0-9)</label>' +
+          '<input type="number" class="arred-digito-valor" min="0" max="9" value="9">' +
+        '</div>' +
+        '<div class="campo-mini oculto config-arred-multiplo">' +
+          '<label>Múltiplo de</label>' +
+          '<input type="number" class="arred-multiplo-valor" value="10" step="0.01">' +
+        '</div>' +
+        '<div class="campo-mini oculto config-arred-decimais">' +
+          '<label>Casas decimais</label>' +
+          '<input type="number" class="arred-decimais-valor" min="0" max="4" value="2">' +
+        '</div>' +
+        '<div class="campo-mini oculto config-arred-direcao">' +
+          '<label>Direção</label>' +
+          '<select class="arred-direcao">' +
+            '<option value="proximo">Mais próximo</option>' +
+            '<option value="cima">Para cima</option>' +
+            '<option value="baixo">Para baixo</option>' +
+          '</select>' +
+        '</div>' +
+      '</div>' +
+    '</details>' +
+
+    '<details>' +
+      '<summary>Formatação de exibição</summary>' +
+      '<div class="linha-campos-personalizado-config">' +
+        '<div class="campo-mini">' +
+          '<label>Casas decimais</label>' +
+          '<input type="number" class="campo-casas" min="0" max="4" value="2">' +
+        '</div>' +
+        '<div class="campo-mini">' +
+          '<label>Separador decimal</label>' +
+          '<select class="campo-sep-decimal">' +
+            '<option value=",">Vírgula</option>' +
+            '<option value=".">Ponto</option>' +
+          '</select>' +
+        '</div>' +
+        '<div class="campo-mini">' +
+          '<label>Separador de milhar</label>' +
+          '<select class="campo-sep-milhar">' +
+            '<option value="">Nenhum</option>' +
+            '<option value=".">Ponto</option>' +
+            '<option value=",">Vírgula</option>' +
+          '</select>' +
+        '</div>' +
+        '<div class="campo-mini">' +
+          '<label>Prefixo</label>' +
+          '<input type="text" class="campo-prefixo" placeholder="ex: R$">' +
+        '</div>' +
+        '<div class="campo-mini">' +
+          '<label>Sufixo</label>' +
+          '<input type="text" class="campo-sufixo" placeholder="ex: /un">' +
+        '</div>' +
+      '</div>' +
+    '</details>' +
+
+    '<div class="mensagem-erro oculto campo-erro-formula"></div>';
+
+  document.getElementById('lista-campos-personalizados').appendChild(div);
+  ligarEventosDaLinhaPersonalizada(div);
+  atualizarOpcoesBaseDeTodosOsCampos();
+  atualizarBotoesDeOrdem();
+  atualizarAvisoSemCampos();
+}
+
+function ligarEventosDaLinhaPersonalizada(linha){
+  linha.querySelector('.botao-remover').addEventListener('click', () => {
+    linha.remove();
+    atualizarOpcoesBaseDeTodosOsCampos();
+    atualizarBotoesDeOrdem();
+    atualizarAvisoSemCampos();
+  });
+
+  linha.querySelector('.botao-mover-cima').addEventListener('click', () => {
+    const anterior = linha.previousElementSibling;
+    if(anterior) linha.parentNode.insertBefore(linha, anterior);
+    atualizarBotoesDeOrdem();
+  });
+  linha.querySelector('.botao-mover-baixo').addEventListener('click', () => {
+    const proxima = linha.nextElementSibling;
+    if(proxima) linha.parentNode.insertBefore(proxima, linha);
+    atualizarBotoesDeOrdem();
+  });
+
+  const selectTipo = linha.querySelector('.campo-tipo');
+  const rotuloParametro = linha.querySelector('.rotulo-parametro');
+  const inputParametro = linha.querySelector('.campo-parametro');
+  const rotulosPorTipo = {
+    percentual: ['Percentual (%)', '-10'],
+    multiplicador: ['Multiplicador (×)', '0.9'],
+    soma: ['Valor a somar', '10'],
+    subtracao: ['Valor a subtrair', '10'],
+    formula: ['Fórmula (valor, conta, ajuste, base)', 'base * 0.9']
+  };
+  selectTipo.addEventListener('change', () => {
+    const [rotulo, exemplo] = rotulosPorTipo[selectTipo.value];
+    rotuloParametro.textContent = rotulo;
+    if(!inputParametro.dataset.tocado) inputParametro.value = exemplo;
+  });
+  inputParametro.addEventListener('input', () => { inputParametro.dataset.tocado = '1'; });
+
+  const selectArred = linha.querySelector('.campo-arredondamento-tipo');
+  selectArred.addEventListener('change', () => {
+    const val = selectArred.value;
+    linha.querySelector('.config-arred-digito').classList.toggle('oculto', val !== 'digito');
+    linha.querySelector('.config-arred-multiplo').classList.toggle('oculto', val !== 'multiplo');
+    linha.querySelector('.config-arred-decimais').classList.toggle('oculto', val !== 'decimais');
+    linha.querySelector('.config-arred-direcao').classList.toggle('oculto', val === 'nenhum');
+  });
+}
+
+function atualizarBotoesDeOrdem(){
+  const linhas = Array.from(document.querySelectorAll('.cartao-campo-personalizado'));
+  linhas.forEach((linha, idx) => {
+    linha.querySelector('.botao-mover-cima').disabled = idx === 0;
+    linha.querySelector('.botao-mover-baixo').disabled = idx === linhas.length - 1;
+  });
+}
+
+// mantem o seletor "baseado em" de cada campo atualizado com o nome dos demais campos (permite encadear campos)
+function atualizarOpcoesBaseDeTodosOsCampos(){
+  const linhas = document.querySelectorAll('.cartao-campo-personalizado');
+  linhas.forEach(linhaAtual => {
+    const selectBase = linhaAtual.querySelector('.campo-base');
+    const valorAnterior = selectBase.value;
+    selectBase.innerHTML =
+      '<option value="valor">valor</option>' +
+      '<option value="conta">valor conta</option>' +
+      '<option value="ajuste">valor ajuste</option>';
+    linhas.forEach(outraLinha => {
+      if(outraLinha === linhaAtual) return;
+      const nomeOutra = outraLinha.querySelector('.campo-nome').value.trim() || 'campo sem nome';
+      const opt = document.createElement('option');
+      opt.value = 'campo:' + outraLinha.dataset.campoId;
+      opt.textContent = nomeOutra + ' (campo personalizado)';
+      selectBase.appendChild(opt);
+    });
+    if(Array.from(selectBase.options).some(o => o.value === valorAnterior)){
+      selectBase.value = valorAnterior;
+    } else if(!selectBase.value){
+      selectBase.value = 'ajuste';
+    }
+  });
+}
+
+function atualizarAvisoSemCampos(){
+  const existemCampos = document.querySelectorAll('.cartao-campo-personalizado').length > 0;
+  document.getElementById('aviso-sem-campos').classList.toggle('oculto', existemCampos);
+}
+
+/* regras de arredondamento reutilizaveis (usadas pelos campos personalizados) */
+function arredondarPorDigito(v, digito, direcao){
+  let base = Math.floor(v / 10) * 10 + digito;
+  if(direcao === 'cima'){ if(base < v - 1e-9) base += 10; return base; }
+  if(direcao === 'baixo'){ if(base > v + 1e-9) base -= 10; return base; }
+  const inferior = base > v ? base - 10 : base;
+  const superior = inferior + 10;
+  return (v - inferior) <= (superior - v) ? inferior : superior;
+}
+function arredondarPorMultiplo(v, passo, direcao){
+  if(direcao === 'cima') return Math.ceil(v / passo) * passo;
+  if(direcao === 'baixo') return Math.floor(v / passo) * passo;
+  return Math.round(v / passo) * passo;
+}
+function arredondarPorDecimais(v, casas, direcao){
+  const fator = Math.pow(10, casas);
+  if(direcao === 'cima') return Math.ceil(v * fator) / fator;
+  if(direcao === 'baixo') return Math.floor(v * fator) / fator;
+  return Math.round(v * fator) / fator;
+}
+function aplicarArredondamentoDoCampo(v, cfg){
+  if(isNaN(v) || cfg.arredTipo === 'nenhum') return v;
+  if(cfg.arredTipo === 'digito') return arredondarPorDigito(v, cfg.arredDigito, cfg.arredDirecao);
+  if(cfg.arredTipo === 'multiplo') return arredondarPorMultiplo(v, cfg.arredMultiplo, cfg.arredDirecao);
+  if(cfg.arredTipo === 'decimais') return arredondarPorDecimais(v, cfg.arredDecimais, cfg.arredDirecao);
+  return v;
+}
+
+// le a configuracao de cada cartao e ja compila a formula (uma unica vez, nao a cada produto)
+function compilarConfiguracaoDosCampos(){
+  return Array.from(document.querySelectorAll('.cartao-campo-personalizado')).map(linha => {
+    const cfg = {
+      id: linha.dataset.campoId,
+      nome: linha.querySelector('.campo-nome').value.trim() || 'campo',
+      base: linha.querySelector('.campo-base').value,
+      tipo: linha.querySelector('.campo-tipo').value,
+      parametro: linha.querySelector('.campo-parametro').value,
+      arredTipo: linha.querySelector('.campo-arredondamento-tipo').value,
+      arredDigito: Math.max(0, Math.min(9, parseInt(linha.querySelector('.arred-digito-valor').value) || 0)),
+      arredMultiplo: parseFloat(linha.querySelector('.arred-multiplo-valor').value) || 1,
+      arredDecimais: Math.max(0, Math.min(4, parseInt(linha.querySelector('.arred-decimais-valor').value) || 0)),
+      arredDirecao: linha.querySelector('.arred-direcao').value,
+      casas: Math.max(0, Math.min(4, parseInt(linha.querySelector('.campo-casas').value) || 2)),
+      sepDecimal: linha.querySelector('.campo-sep-decimal').value,
+      sepMilhar: linha.querySelector('.campo-sep-milhar').value,
+      prefixo: linha.querySelector('.campo-prefixo').value,
+      sufixo: linha.querySelector('.campo-sufixo').value,
+      fnFormula: null
+    };
+    linha.classList.remove('campo-com-erro');
+    linha.querySelector('.campo-erro-formula').classList.add('oculto');
+
+    if(cfg.tipo === 'formula'){
+      try{
+        if(!/^[a-zA-Z0-9+\-*/().,\s]+$/.test(cfg.parametro || '')){
+          throw new Error('use apenas números, letras, + - * / ( ) e as variáveis valor/conta/ajuste/base');
+        }
+        const fnTeste = new Function('valor', 'conta', 'ajuste', 'base', 'return (' + cfg.parametro + ');');
+        fnTeste(1, 1, 1, 1);
+        cfg.fnFormula = (valor, conta, ajuste, base) => {
+          try{ return fnTeste(valor, conta, ajuste, base); }catch(e){ return NaN; }
+        };
+      }catch(err){
+        const linhaEl = linha;
+        linhaEl.classList.add('campo-com-erro');
+        const msg = linhaEl.querySelector('.campo-erro-formula');
+        msg.textContent = 'Fórmula inválida: ' + err.message;
+        msg.classList.remove('oculto');
+        cfg.fnFormula = () => NaN;
+      }
+    }
+    return cfg;
+  });
+}
+
+// resolve o valor-base de um campo, podendo ser valor/conta/ajuste ou outro campo ja calculado
+function resolverBaseDoCampo(cfg, valor, conta, ajuste, valoresPorCampoId){
+  if(cfg.base === 'valor') return valor;
+  if(cfg.base === 'conta') return conta;
+  if(cfg.base === 'ajuste') return ajuste;
+  if(cfg.base.indexOf('campo:') === 0){
+    const idRef = cfg.base.slice(6);
+    return Object.prototype.hasOwnProperty.call(valoresPorCampoId, idRef) ? valoresPorCampoId[idRef] : NaN;
+  }
+  return NaN;
+}
+
+function calcularCampoPersonalizado(cfg, valor, conta, ajuste, valoresPorCampoId){
+  const baseVal = resolverBaseDoCampo(cfg, valor, conta, ajuste, valoresPorCampoId);
+  let bruto;
+  if(cfg.tipo === 'percentual'){
+    bruto = baseVal * (1 + (parseFloat(cfg.parametro) || 0) / 100);
+  } else if(cfg.tipo === 'multiplicador'){
+    bruto = baseVal * (parseFloat(cfg.parametro) || 1);
+  } else if(cfg.tipo === 'soma'){
+    bruto = baseVal + (parseFloat(cfg.parametro) || 0);
+  } else if(cfg.tipo === 'subtracao'){
+    bruto = baseVal - (parseFloat(cfg.parametro) || 0);
+  } else {
+    bruto = cfg.fnFormula ? cfg.fnFormula(valor, conta, ajuste, baseVal) : NaN;
+  }
+  return aplicarArredondamentoDoCampo(bruto, cfg);
+}
+
+/* toggles dos radios (conta / ajuste) */
+document.querySelectorAll('input[name="conta-tipo"]').forEach(r => {
+  r.addEventListener('change', () => {
+    const val = document.querySelector('input[name="conta-tipo"]:checked').value;
+    document.getElementById('campos-conta-percentual').classList.toggle('oculto', val !== 'percentual');
+    document.getElementById('campos-conta-mult').classList.toggle('oculto', val !== 'multiplicador');
+    document.getElementById('campos-conta-formula').classList.toggle('oculto', val !== 'formula');
+  });
+});
+document.querySelectorAll('input[name="ajuste-tipo"]').forEach(r => {
+  r.addEventListener('change', () => {
+    const val = document.querySelector('input[name="ajuste-tipo"]:checked').value;
+    document.getElementById('campos-ajuste-digito').classList.toggle('oculto', val !== 'digito');
+    document.getElementById('campos-ajuste-multiplo').classList.toggle('oculto', val !== 'multiplo');
+    document.getElementById('campos-ajuste-decimais').classList.toggle('oculto', val !== 'decimais');
+  });
+});
+
+/* ===================== modo de calculo: unico ou por faixas de valor ===================== */
+let contadorFaixas = 0;
+
+document.querySelectorAll('input[name="modo-calculo"]').forEach(r => {
+  r.addEventListener('change', () => {
+    const porFaixas = document.querySelector('input[name="modo-calculo"]:checked').value === 'faixas';
+    document.getElementById('secao-faixas').classList.toggle('oculto', !porFaixas);
+    const sufixo = porFaixas ? ' (regra padrão — usada quando nenhuma faixa bate)' : '';
+    document.getElementById('rotulo-regra-padrao-conta').textContent = 'Valor conta' + sufixo;
+    document.getElementById('rotulo-regra-padrao-ajuste').textContent = 'Valor ajuste' + sufixo;
+  });
+});
+
+document.getElementById('botao-add-faixa').addEventListener('click', adicionarFaixaDeValor);
+
+function adicionarFaixaDeValor(){
+  contadorFaixas++;
+  const div = document.createElement('div');
+  div.className = 'cartao-faixa-valor';
+  div.dataset.faixaId = String(contadorFaixas);
+  div.innerHTML =
+    '<div class="linha-topo-campo">' +
+      '<div class="linha-campos-personalizado-config" style="flex:1;margin-bottom:0;">' +
+        '<div class="campo-mini" style="max-width:140px;">' +
+          '<label>De (mínimo)</label>' +
+          '<input type="number" class="faixa-min" value="0" step="0.01">' +
+        '</div>' +
+        '<div class="campo-mini faixa-campo-max" style="max-width:140px;">' +
+          '<label>Até (menor que)</label>' +
+          '<input type="number" class="faixa-max" value="100" step="0.01">' +
+        '</div>' +
+        '<div class="campo-checkbox">' +
+          '<label><input type="checkbox" class="faixa-sem-limite"> sem limite superior</label>' +
+        '</div>' +
+      '</div>' +
+      '<div class="botoes-ordem">' +
+        '<button type="button" class="botao-ordem botao-mover-cima" title="Mover para cima">&uarr;</button>' +
+        '<button type="button" class="botao-ordem botao-mover-baixo" title="Mover para baixo">&darr;</button>' +
+      '</div>' +
+      '<button type="button" class="botao-remover">Remover</button>' +
+    '</div>' +
+
+    '<div class="linha-campos-personalizado-config">' +
+      '<div class="campo-mini">' +
+        '<label>Cálculo do valor conta</label>' +
+        '<select class="faixa-conta-tipo">' +
+          '<option value="percentual">Percentual (%)</option>' +
+          '<option value="multiplicador">Multiplicador (×)</option>' +
+          '<option value="formula">Fórmula</option>' +
+        '</select>' +
+      '</div>' +
+      '<div class="campo-mini">' +
+        '<label class="faixa-conta-rotulo">Percentual (%)</label>' +
+        '<input type="text" class="faixa-conta-parametro" value="80">' +
+      '</div>' +
+    '</div>' +
+
+    '<div class="linha-campos-personalizado-config">' +
+      '<div class="campo-mini">' +
+        '<label>Arredondamento (valor ajuste)</label>' +
+        '<select class="faixa-ajuste-tipo">' +
+          '<option value="digito">Terminar em dígito</option>' +
+          '<option value="multiplo">Múltiplo de</option>' +
+          '<option value="decimais">Casas decimais</option>' +
+        '</select>' +
+      '</div>' +
+      '<div class="campo-mini faixa-campo-digito">' +
+        '<label>Dígito final</label>' +
+        '<input type="number" class="faixa-ajuste-digito" min="0" max="9" value="9">' +
+      '</div>' +
+      '<div class="campo-mini oculto faixa-campo-multiplo">' +
+        '<label>Múltiplo de</label>' +
+        '<input type="number" class="faixa-ajuste-multiplo" value="10" step="0.01">' +
+      '</div>' +
+      '<div class="campo-mini oculto faixa-campo-decimais">' +
+        '<label>Casas decimais</label>' +
+        '<input type="number" class="faixa-ajuste-decimais" min="0" max="4" value="2">' +
+      '</div>' +
+      '<div class="campo-mini">' +
+        '<label>Direção</label>' +
+        '<select class="faixa-ajuste-direcao">' +
+          '<option value="cima">Para cima</option>' +
+          '<option value="baixo">Para baixo</option>' +
+          '<option value="proximo">Mais próximo</option>' +
+        '</select>' +
+      '</div>' +
+    '</div>';
+
+  document.getElementById('lista-faixas').appendChild(div);
+  ligarEventosDaFaixa(div);
+  atualizarBotoesDeOrdemFaixas();
+  atualizarAvisoSemFaixas();
+}
+
+function ligarEventosDaFaixa(cartao){
+  cartao.querySelector('.botao-remover').addEventListener('click', () => {
+    cartao.remove();
+    atualizarBotoesDeOrdemFaixas();
+    atualizarAvisoSemFaixas();
+  });
+  cartao.querySelector('.botao-mover-cima').addEventListener('click', () => {
+    const anterior = cartao.previousElementSibling;
+    if(anterior) cartao.parentNode.insertBefore(cartao, anterior);
+    atualizarBotoesDeOrdemFaixas();
+  });
+  cartao.querySelector('.botao-mover-baixo').addEventListener('click', () => {
+    const proxima = cartao.nextElementSibling;
+    if(proxima) cartao.parentNode.insertBefore(proxima, cartao);
+    atualizarBotoesDeOrdemFaixas();
+  });
+
+  const semLimite = cartao.querySelector('.faixa-sem-limite');
+  const campoMax = cartao.querySelector('.faixa-max');
+  semLimite.addEventListener('change', () => {
+    campoMax.disabled = semLimite.checked;
+    cartao.querySelector('.faixa-campo-max').style.opacity = semLimite.checked ? '.4' : '1';
+  });
+
+  const selectContaTipo = cartao.querySelector('.faixa-conta-tipo');
+  const rotuloContaParam = cartao.querySelector('.faixa-conta-rotulo');
+  const inputContaParam = cartao.querySelector('.faixa-conta-parametro');
+  const rotulosContaPorTipo = {
+    percentual: ['Percentual (%)', '80'],
+    multiplicador: ['Multiplicador (×)', '1.8'],
+    formula: ['Fórmula (use "valor")', 'valor * 1.8']
+  };
+  selectContaTipo.addEventListener('change', () => {
+    const [rotulo, exemplo] = rotulosContaPorTipo[selectContaTipo.value];
+    rotuloContaParam.textContent = rotulo;
+    if(!inputContaParam.dataset.tocado) inputContaParam.value = exemplo;
+  });
+  inputContaParam.addEventListener('input', () => { inputContaParam.dataset.tocado = '1'; });
+
+  const selectAjusteTipo = cartao.querySelector('.faixa-ajuste-tipo');
+  selectAjusteTipo.addEventListener('change', () => {
+    const val = selectAjusteTipo.value;
+    cartao.querySelector('.faixa-campo-digito').classList.toggle('oculto', val !== 'digito');
+    cartao.querySelector('.faixa-campo-multiplo').classList.toggle('oculto', val !== 'multiplo');
+    cartao.querySelector('.faixa-campo-decimais').classList.toggle('oculto', val !== 'decimais');
+  });
+}
+
+function atualizarBotoesDeOrdemFaixas(){
+  const cartoes = Array.from(document.querySelectorAll('.cartao-faixa-valor'));
+  cartoes.forEach((cartao, idx) => {
+    cartao.querySelector('.botao-mover-cima').disabled = idx === 0;
+    cartao.querySelector('.botao-mover-baixo').disabled = idx === cartoes.length - 1;
+  });
+}
+
+function atualizarAvisoSemFaixas(){
+  const existemFaixas = document.querySelectorAll('.cartao-faixa-valor').length > 0;
+  document.getElementById('aviso-sem-faixas').classList.toggle('oculto', existemFaixas);
+}
+
+// compila as faixas uma unica vez (inclusive formulas), na ordem em que aparecem na tela
+function compilarFaixasDeValor(){
+  return Array.from(document.querySelectorAll('.cartao-faixa-valor')).map(cartao => {
+    const min = parseFloat(cartao.querySelector('.faixa-min').value);
+    const semLimite = cartao.querySelector('.faixa-sem-limite').checked;
+    const max = semLimite ? Infinity : parseFloat(cartao.querySelector('.faixa-max').value);
+
+    const tipoConta = cartao.querySelector('.faixa-conta-tipo').value;
+    const paramConta = cartao.querySelector('.faixa-conta-parametro').value;
+    let fnConta;
+    if(tipoConta === 'percentual'){
+      const pct = parseFloat(paramConta) || 0;
+      fnConta = v => v * (1 + pct / 100);
+    } else if(tipoConta === 'multiplicador'){
+      const mult = parseFloat(paramConta) || 1;
+      fnConta = v => v * mult;
+    } else {
+      fnConta = criarFuncaoFormula(paramConta || 'valor', ['valor']);
+    }
+
+    const tipoAjuste = cartao.querySelector('.faixa-ajuste-tipo').value;
+    const direcao = cartao.querySelector('.faixa-ajuste-direcao').value;
+    let fnAjuste;
+    if(tipoAjuste === 'digito'){
+      const digito = Math.max(0, Math.min(9, parseInt(cartao.querySelector('.faixa-ajuste-digito').value) || 0));
+      fnAjuste = v => arredondarPorDigito(v, digito, direcao);
+    } else if(tipoAjuste === 'multiplo'){
+      const passo = parseFloat(cartao.querySelector('.faixa-ajuste-multiplo').value) || 1;
+      fnAjuste = v => arredondarPorMultiplo(v, passo, direcao);
+    } else {
+      const casas = Math.max(0, Math.min(4, parseInt(cartao.querySelector('.faixa-ajuste-decimais').value) || 0));
+      fnAjuste = v => arredondarPorDecimais(v, casas, direcao);
+    }
+
+    return {
+      min: isNaN(min) ? -Infinity : min,
+      max: isNaN(max) ? Infinity : max,
+      fnConta: fnConta,
+      fnAjuste: fnAjuste
+    };
+  });
+}
+
+// devolve a regra (funcoes de conta/ajuste) que vale para esse valor: a primeira faixa que bater, ou a regra padrao
+function obterRegraParaValor(valor, faixas, fnContaPadrao, fnAjustePadrao){
+  const faixaEncontrada = faixas.find(f => valor >= f.min && valor < f.max);
+  if(faixaEncontrada) return { fnConta: faixaEncontrada.fnConta, fnAjuste: faixaEncontrada.fnAjuste };
+  return { fnConta: fnContaPadrao, fnAjuste: fnAjustePadrao };
+}
+
+/* ===================== aplicar / gerar tabela ===================== */
+document.getElementById('botao-aplicar').addEventListener('click', () => {
+  if(linhasBrutas.length === 0){ alert('Carregue um arquivo primeiro.'); return; }
+
+  const idxProduto = parseInt(colunaProdutoSel.value);
+  const idxValor = parseInt(colunaValorSel.value);
+  const funcaoContaPadrao = obterFuncaoConta();
+  const funcaoAjustePadrao = obterFuncaoAjuste();
+  const casasFmt = Math.max(0, Math.min(4, parseInt(document.getElementById('fmt-decimais').value) || 0));
+  const sepDecimal = document.getElementById('fmt-dec-sep').value;
+  const sepMilhar = document.getElementById('fmt-mil-sep').value;
+  const prefixo = document.getElementById('fmt-prefix').value;
+
+  const modoPorFaixas = document.querySelector('input[name="modo-calculo"]:checked').value === 'faixas';
+  const faixasCompiladas = modoPorFaixas ? compilarFaixasDeValor() : [];
+
+  // compila os campos personalizados uma unica vez (formulas incluidas) antes de rodar produto por produto
+  ultimosCamposPersonalizados = compilarConfiguracaoDosCampos();
+
+  resultados = linhasBrutas.map(linha => {
+    const produto = (linha[idxProduto] || '').trim();
+    const valor = converterParaNumero(linha[idxValor] || '');
+    if(produto === '' || isNaN(valor)) return null;
+
+    const regra = modoPorFaixas
+      ? obterRegraParaValor(valor, faixasCompiladas, funcaoContaPadrao, funcaoAjustePadrao)
+      : { fnConta: funcaoContaPadrao, fnAjuste: funcaoAjustePadrao };
+    const conta = regra.fnConta(valor);
+    const ajuste = regra.fnAjuste(conta);
+
+    // cada campo pode depender de um campo anterior, entao vamos guardando os valores calculados por id
+    const valoresPorCampoId = {};
+    const extras = {};
+    ultimosCamposPersonalizados.forEach(cfg => {
+      const valorCampo = calcularCampoPersonalizado(cfg, valor, conta, ajuste, valoresPorCampoId);
+      valoresPorCampoId[cfg.id] = valorCampo;
+      extras[cfg.nome] = formatarComOpcoes(valorCampo, cfg.casas, cfg.sepDecimal, cfg.sepMilhar, cfg.prefixo, cfg.sufixo);
+    });
+
+    return {
+      produto: produto,
+      valor: valor,
+      valorTexto: formatarValorPtBr(valor),
+      conta: conta,
+      contaTexto: formatarValorPtBr(conta),
+      ajuste: ajuste,
+      ajusteTexto: formatarComOpcoes(ajuste, casasFmt, sepDecimal, sepMilhar, prefixo),
+      extras: extras
+    };
+  }).filter(Boolean);
+
+  painelResultado.classList.remove('oculto');
+  document.getElementById('entrada-busca').value = '';
+  montarCabecalhoTabela();
+  aplicarResultadosNaTela(resultados, '');
+});
+
+/* ===================== tabela, busca e exportacao ===================== */
+function montarCabecalhoTabela(){
+  const th = ['', 'Produto', 'valor', 'valor conta', 'valor ajuste', 'Ações', ...ultimosCamposPersonalizados.map(c => c.nome)];
+  const linhaCabecalho = th.map((texto, idx) => {
+    const classeNum = (idx > 1 && texto !== 'Ações') ? ' class="numero"' : '';
+    const estiloCentro = (idx === 0 || texto === 'Ações') ? ' style="text-align:center;"' : '';
+    return '<th' + classeNum + estiloCentro + '>' + escaparHtml(texto) + '</th>';
+  }).join('');
+  document.getElementById('cabecalho-tabela').innerHTML = '<tr>' + linhaCabecalho + '</tr>';
+}
+
+function escaparHtml(str){
+  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+// versao para uso dentro de atributos HTML (ex: data-produto="..."), tambem escapa aspas
+function escaparAtributo(str){
+  return escaparHtml(str).replace(/"/g, '&quot;');
+}
+function destacarTermo(texto, termo){
+  if(!termo) return escaparHtml(texto);
+  const textoEscapado = escaparHtml(texto);
+  const termoEscapado = escaparHtml(termo).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const re = new RegExp('(' + termoEscapado + ')', 'ig');
+  return textoEscapado.replace(re, '<mark>$1</mark>');
+}
+
+// monta a lista que deve aparecer na tela: aplica busca, os dois filtros de favoritos e a ordenacao.
+// "apenas favoritos" tem prioridade (se marcado, o outro filtro fica sem efeito).
+// "favoritos junto a lista": quando ha uma busca ativa, inclui tambem os favoritos que a busca nao encontrou,
+// sem nunca duplicar uma linha que ja esteja nos resultados (comparando por referencia, nao so por nome,
+// pois pode existir mais de um produto com o mesmo nome).
+function calcularListaExibida(termo){
+  const apenasFavoritosEl = document.getElementById('filtro-apenas-favoritos');
+  const favoritosJuntoEl = document.getElementById('filtro-favoritos-junto');
+  const apenasFavoritos = !!(apenasFavoritosEl && apenasFavoritosEl.checked);
+  const favoritosJunto = !apenasFavoritos && !!(favoritosJuntoEl && favoritosJuntoEl.checked);
+
+  let lista = resultados;
+
+  if(termo){
+    const termoMinusculo = termo.toLowerCase();
+    lista = lista.filter(item => item.produto.toLowerCase().includes(termoMinusculo));
+
+    if(favoritosJunto){
+      const jaPresentes = new Set(lista);
+      for(const item of resultados){
+        if(favoritos.has(item.produto) && !jaPresentes.has(item)){
+          lista.push(item);
+          jaPresentes.add(item);
+        }
+      }
+    }
+  }
+
+  if(apenasFavoritos){
+    lista = lista.filter(item => favoritos.has(item.produto));
+  }
+
+  // favoritos aparecem primeiro quando nao ha busca, ou quando "favoritos junto a lista" esta ativo
+  // (assim eles ficam bem visiveis mesmo misturados aos resultados de uma pesquisa)
+  if(!termo || favoritosJunto){
+    lista = lista
+      .map((item, indiceOriginal) => ({ item, indiceOriginal }))
+      .sort((a, b) => {
+        const favA = favoritos.has(a.item.produto) ? 0 : 1;
+        const favB = favoritos.has(b.item.produto) ? 0 : 1;
+        if(favA !== favB) return favA - favB;
+        return a.indiceOriginal - b.indiceOriginal; // mantem a ordem original dentro de cada grupo
+      })
+      .map(par => par.item);
+  }
+  return lista;
+}
+
+function aplicarResultadosNaTela(baseResultados, termo){
+  termoBuscaAtual = termo || '';
+  const lista = calcularListaExibida(termoBuscaAtual);
+  resultadosVisiveis = lista;
+  renderizarTabela(lista, termoBuscaAtual);
+
+  const apenasFavoritosEl = document.getElementById('filtro-apenas-favoritos');
+  const favoritosJuntoEl = document.getElementById('filtro-favoritos-junto');
+  const somenteFavoritos = !!(apenasFavoritosEl && apenasFavoritosEl.checked);
+  const favoritosJunto = !somenteFavoritos && !!(favoritosJuntoEl && favoritosJuntoEl.checked);
+
+  let sufixoFavoritos = '';
+  if(somenteFavoritos) sufixoFavoritos = ' (somente favoritos)';
+  else if(favoritosJunto && termoBuscaAtual) sufixoFavoritos = ' + favoritos';
+
+  if(termoBuscaAtual){
+    document.getElementById('texto-status').textContent = 'Resultado para "' + termoBuscaAtual + '"' + sufixoFavoritos;
+    document.getElementById('contagem-status').textContent = lista.length + ' encontrado(s)';
+  } else {
+    document.getElementById('texto-status').textContent = (somenteFavoritos ? 'Mostrando favoritos' : 'Mostrando todos os produtos');
+    document.getElementById('contagem-status').textContent = lista.length + ' itens';
+  }
+}
+
+function renderizarTabela(lista, termo){
+  listaRenderizadaAtual = lista;
+  const corpo = document.getElementById('corpo-tabela');
+  const tabela = document.getElementById('tabela-resultado');
+  const estadoVazio = document.getElementById('estado-vazio');
+  corpo.innerHTML = '';
+  if(lista.length === 0){
+    tabela.classList.add('oculto');
+    estadoVazio.classList.remove('oculto');
+    return;
+  }
+  tabela.classList.remove('oculto');
+  estadoVazio.classList.add('oculto');
+  corpo.innerHTML = lista.map((item, indice) => {
+    const ehFavorito = favoritos.has(item.produto);
+    let celulas = '<td class="col-fav"><button type="button" class="botao-favorito' + (ehFavorito ? ' favorito-ativo' : '') +
+      '" data-indice="' + indice + '" title="' + (ehFavorito ? 'Remover dos favoritos' : 'Adicionar aos favoritos') + '">' +
+      (ehFavorito ? '★' : '☆') + '</button></td>';
+    celulas += '<td>' + destacarTermo(item.produto, termo) + '</td>';
+    celulas += '<td class="numero">' + item.valorTexto + '</td>';
+    celulas += '<td class="numero">' + item.contaTexto + '</td>';
+    celulas += '<td class="numero valor-destaque">' + item.ajusteTexto + '</td>';
+
+    // Botão de copiar (pega o valor ajuste exato) + botão de adicionar à calculadora de orçamento
+    celulas += '<td class="acao">' +
+      '<button type="button" class="botao-copiar" data-copiar="' + item.ajusteTexto + '">Copiar</button>' +
+      '<button type="button" class="botao-add-calc" data-indice="' + indice + '" title="Adicionar à calculadora de orçamento">+ Orçamento</button>' +
+      '</td>';
+
+    ultimosCamposPersonalizados.forEach(cfg => {
+      celulas += '<td class="numero">' + (item.extras[cfg.nome] || '') + '</td>';
+    });
+    return '<tr>' + celulas + '</tr>';
+  }).join('');
+}
+
+document.getElementById('botao-buscar').addEventListener('click', buscarProduto);
+document.getElementById('entrada-busca').addEventListener('keydown', e => { if(e.key === 'Enter') buscarProduto(); });
+document.getElementById('botao-limpar-busca').addEventListener('click', () => {
+  document.getElementById('entrada-busca').value = '';
+  aplicarResultadosNaTela(resultados, '');
+});
+document.getElementById('filtro-apenas-favoritos').addEventListener('change', e => {
+  // "apenas favoritos" tem prioridade: desativa visualmente o outro filtro enquanto estiver marcado
+  document.getElementById('filtro-favoritos-junto').disabled = e.target.checked;
+  aplicarResultadosNaTela(resultados, termoBuscaAtual);
+});
+document.getElementById('filtro-favoritos-junto').addEventListener('change', () => {
+  aplicarResultadosNaTela(resultados, termoBuscaAtual);
+});
+function buscarProduto(){
+  const termo = document.getElementById('entrada-busca').value.trim();
+  aplicarResultadosNaTela(resultados, termo);
+}
+
+/* exportacao: sempre usa o que esta visivel na tabela (resultadosVisiveis), respeitando a busca */
+function montarLinhasParaExportar(){
+  const cabecalhos = ['produto', 'valor', 'valor conta', 'valor ajuste', ...ultimosCamposPersonalizados.map(c => c.nome)];
+  const linhas = resultadosVisiveis.map(item => {
+    const linha = [item.produto, item.valorTexto, item.contaTexto, item.ajusteTexto];
+    ultimosCamposPersonalizados.forEach(cfg => linha.push(item.extras[cfg.nome] || ''));
+    return linha;
+  });
+  return { cabecalhos, linhas };
+}
+
+function dispararDownload(blob, nomeArquivo){
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = nomeArquivo;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function baixarComoCSV(){
+  const { cabecalhos, linhas } = montarLinhasParaExportar();
+  const linhasTexto = [cabecalhos.join(',')].concat(
+    linhas.map(l => l.map(v => '"' + String(v).replace(/"/g, '""') + '"').join(','))
+  );
+  const conteudo = '\uFEFF' + linhasTexto.join('\r\n');
+  const blob = new Blob([conteudo], { type: 'text/csv;charset=utf-8;' });
+  dispararDownload(blob, 'resultado.csv');
+}
+
+function baixarComoExcel(){
+  if(typeof XLSX === 'undefined'){ alert('A biblioteca de Excel não carregou. Verifique sua conexão com a internet.'); return; }
+  const { cabecalhos, linhas } = montarLinhasParaExportar();
+  const planilha = XLSX.utils.aoa_to_sheet([cabecalhos, ...linhas]);
+  const livro = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(livro, planilha, 'Resultado');
+  XLSX.writeFile(livro, 'resultado.xlsx');
+}
+
+function baixarComoPDF(){
+  if(typeof window.jspdf === 'undefined'){ alert('A biblioteca de PDF não carregou. Verifique sua conexão com a internet.'); return; }
+  const { cabecalhos, linhas } = montarLinhasParaExportar();
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  doc.autoTable({ head: [cabecalhos], body: linhas, styles: { fontSize: 8 } });
+  doc.save('resultado.pdf');
+}
+
+document.getElementById('botao-baixar').addEventListener('click', () => {
+  if(resultadosVisiveis.length === 0){ alert('Gere a tabela primeiro clicando em "Aplicar e gerar tabela".'); return; }
+  const formato = document.getElementById('formato-exportacao').value;
+  if(formato === 'csv') baixarComoCSV();
+  else if(formato === 'xlsx') baixarComoExcel();
+  else if(formato === 'pdf') baixarComoPDF();
+});
+
+// --- AÇÕES DA TABELA: copiar, favoritar e adicionar à calculadora ---
+document.getElementById('corpo-tabela').addEventListener('click', function(e) {
+  const botaoCopiar = e.target.closest('.botao-copiar');
+  if(botaoCopiar){
+    const valorParaCopiar = botaoCopiar.getAttribute('data-copiar');
+    navigator.clipboard.writeText(valorParaCopiar).then(() => {
+      botaoCopiar.textContent = 'Copiado!';
+      botaoCopiar.classList.add('copiado');
+      setTimeout(() => {
+        botaoCopiar.textContent = 'Copiar';
+        botaoCopiar.classList.remove('copiado');
+      }, 1500);
+    }).catch(err => {
+      console.error('Falha ao copiar:', err);
+      alert('Não foi possível copiar o valor.');
+    });
+    return;
+  }
+
+  const botaoFav = e.target.closest('.botao-favorito');
+  if(botaoFav){
+    const item = listaRenderizadaAtual[parseInt(botaoFav.dataset.indice, 10)];
+    if(item){
+      alternarFavorito(item.produto);
+      aplicarResultadosNaTela(resultados, termoBuscaAtual);
+    }
+    return;
+  }
+
+  const botaoAddCalc = e.target.closest('.botao-add-calc');
+  if(botaoAddCalc){
+    const item = listaRenderizadaAtual[parseInt(botaoAddCalc.dataset.indice, 10)];
+    if(item){
+      adicionarItemNaCalculadora(item.produto, item.ajuste, item.ajusteTexto);
+      botaoAddCalc.textContent = 'Adicionado!';
+      botaoAddCalc.classList.add('adicionado');
+      setTimeout(() => {
+        botaoAddCalc.textContent = '+ Orçamento';
+        botaoAddCalc.classList.remove('adicionado');
+      }, 1200);
+    }
+    return;
+  }
+});
+
+/* ===================== calculadora de orçamento ===================== */
+const painelCalculadora = document.getElementById('painel-calculadora');
+const listaCalculadoraEl = document.getElementById('lista-calculadora');
+const calculadoraVaziaEl = document.getElementById('calculadora-vazia');
+const totalCalculadoraEl = document.getElementById('total-calculadora');
+const badgeCalculadoraEl = document.getElementById('badge-calculadora');
+const botaoCalculadoraEl = document.getElementById('botao-calculadora');
+
+function formatarMoedaCalculadora(num){
+  return formatarComOpcoes(num, 2, ',', '.', 'R$');
+}
+
+function encontrarItemCalculadora(produto){
+  return itensCalculadora.find(it => it.produto === produto);
+}
+
+// adiciona um produto (ou soma +1 na quantidade se ja estiver na lista) e revela o painel da calculadora
+function adicionarItemNaCalculadora(produto, valorUnitario, valorUnitarioTexto){
+  const painelEstavaOculto = painelCalculadora.classList.contains('oculto');
+  const existente = encontrarItemCalculadora(produto);
+  if(existente){
+    existente.quantidade += 1;
+  } else {
+    itensCalculadora.push({ produto, valorUnitario, valorUnitarioTexto, quantidade: 1 });
+  }
+  painelCalculadora.classList.remove('oculto');
+  renderizarCalculadora();
+  if(painelEstavaOculto){
+    painelCalculadora.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+}
+
+function removerItemDaCalculadora(produto){
+  itensCalculadora = itensCalculadora.filter(it => it.produto !== produto);
+  renderizarCalculadora();
+}
+
+function ajustarQuantidade(produto, delta){
+  const item = encontrarItemCalculadora(produto);
+  if(!item) return;
+  item.quantidade = Math.max(1, item.quantidade + delta);
+  renderizarCalculadora();
+}
+
+function definirQuantidade(produto, novaQuantidade){
+  const item = encontrarItemCalculadora(produto);
+  if(!item) return;
+  let q = parseInt(novaQuantidade, 10);
+  if(isNaN(q) || q < 1) q = 1;
+  item.quantidade = q;
+  return item;
+}
+
+function construirTabelaCalculadora(){
+  const linhas = itensCalculadora.map(item => {
+    const subtotal = item.valorUnitario * item.quantidade;
+    const produtoAttr = escaparAtributo(item.produto);
+    return '<tr>' +
+      '<td>' + escaparHtml(item.produto) + '</td>' +
+      '<td class="numero">' + item.valorUnitarioTexto + '</td>' +
+      '<td>' +
+        '<div class="controle-quantidade">' +
+          '<button type="button" class="botao-qtd botao-menos" data-produto="' + produtoAttr + '" title="Diminuir">−</button>' +
+          '<input type="number" class="input-quantidade" min="1" step="1" value="' + item.quantidade + '" data-produto="' + produtoAttr + '">' +
+          '<button type="button" class="botao-qtd botao-mais" data-produto="' + produtoAttr + '" title="Aumentar">+</button>' +
+        '</div>' +
+      '</td>' +
+      '<td class="numero subtotal-calc">' + formatarMoedaCalculadora(subtotal) + '</td>' +
+      '<td class="acao"><button type="button" class="botao-remover-calc" data-produto="' + produtoAttr + '" title="Remover item">✕</button></td>' +
+    '</tr>';
+  }).join('');
+
+  return '<div class="tabela-scroll"><table class="tabela-calculadora">' +
+    '<thead><tr>' +
+      '<th>Produto</th><th class="numero">Valor unit.</th><th>Quantidade</th><th class="numero">Subtotal</th><th class="acao-col"></th>' +
+    '</tr></thead>' +
+    '<tbody>' + linhas + '</tbody>' +
+  '</table></div>';
+}
+
+function atualizarTotalETopoDaCalculadora(){
+  const total = itensCalculadora.reduce((soma, it) => soma + it.valorUnitario * it.quantidade, 0);
+  totalCalculadoraEl.textContent = formatarMoedaCalculadora(total);
+  const totalItens = itensCalculadora.reduce((soma, it) => soma + it.quantidade, 0);
+  badgeCalculadoraEl.textContent = String(totalItens);
+  badgeCalculadoraEl.classList.toggle('oculto', totalItens === 0);
+}
+
+function renderizarCalculadora(){
+  if(itensCalculadora.length === 0){
+    listaCalculadoraEl.innerHTML = '';
+    calculadoraVaziaEl.classList.remove('oculto');
+  } else {
+    calculadoraVaziaEl.classList.add('oculto');
+    listaCalculadoraEl.innerHTML = construirTabelaCalculadora();
+  }
+  atualizarTotalETopoDaCalculadora();
+}
+
+// cliques dentro da calculadora: +, - e remover
+listaCalculadoraEl.addEventListener('click', e => {
+  const botaoMenos = e.target.closest('.botao-menos');
+  if(botaoMenos){ ajustarQuantidade(botaoMenos.dataset.produto, -1); return; }
+
+  const botaoMais = e.target.closest('.botao-mais');
+  if(botaoMais){ ajustarQuantidade(botaoMais.dataset.produto, +1); return; }
+
+  const botaoRemover = e.target.closest('.botao-remover-calc');
+  if(botaoRemover){ removerItemDaCalculadora(botaoRemover.dataset.produto); return; }
+});
+
+// digitar diretamente no campo de quantidade: atualiza subtotal/total instantaneamente sem perder o foco do campo
+listaCalculadoraEl.addEventListener('input', e => {
+  if(!e.target.classList.contains('input-quantidade')) return;
+  const produto = e.target.dataset.produto;
+  const item = encontrarItemCalculadora(produto);
+  if(!item) return;
+  const bruto = parseInt(e.target.value, 10);
+  item.quantidade = (!isNaN(bruto) && bruto >= 1) ? bruto : item.quantidade;
+  const linha = e.target.closest('tr');
+  if(linha){
+    const celulaSubtotal = linha.querySelector('.subtotal-calc');
+    if(celulaSubtotal) celulaSubtotal.textContent = formatarMoedaCalculadora(item.valorUnitario * item.quantidade);
+  }
+  atualizarTotalETopoDaCalculadora();
+});
+
+// ao sair do campo (blur/enter), normaliza o valor exibido (garante minimo 1)
+listaCalculadoraEl.addEventListener('change', e => {
+  if(!e.target.classList.contains('input-quantidade')) return;
+  const item = definirQuantidade(e.target.dataset.produto, e.target.value);
+  if(item) e.target.value = item.quantidade;
+  atualizarTotalETopoDaCalculadora();
+});
+
+document.getElementById('botao-limpar-calculadora').addEventListener('click', () => {
+  if(itensCalculadora.length === 0) return;
+  if(!confirm('Remover todos os itens da calculadora de orçamento?')) return;
+  itensCalculadora = [];
+  renderizarCalculadora();
+});
+
+botaoCalculadoraEl.addEventListener('click', () => {
+  const abrindo = painelCalculadora.classList.contains('oculto');
+  painelCalculadora.classList.toggle('oculto');
+  if(abrindo) painelCalculadora.scrollIntoView({ behavior: 'smooth', block: 'start' });
+});
+
+</script>
+</body>
+</html>

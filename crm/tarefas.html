@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Central de Ferramentas — Tarefas do CRM</title>
+
+  <script>
+    document.documentElement.dataset.theme = localStorage.getItem("ctf_tema") || "dark";
+  </script>
+
+  <link rel="stylesheet" href="../assets/css/tokens.css" />
+  <link rel="stylesheet" href="../assets/css/base.css" />
+  <link rel="stylesheet" href="../assets/css/components.css" />
+</head>
+<body data-module="crm-tarefas">
+  <div class="app-shell">
+    <div id="app-sidebar"></div>
+    <div id="app-header"></div>
+
+    <main class="app-main">
+      <div class="page-header">
+        <div>
+          <h1>Tarefas</h1>
+          <p style="color:var(--muted)">Follow-ups e atividades do CRM, opcionalmente vinculados a um cliente.</p>
+        </div>
+        <button class="btn btn-primary" id="botao-nova-tarefa">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 5v14M5 12h14"/></svg>
+          Nova tarefa
+        </button>
+      </div>
+
+      <div id="quadro" class="kanban-board"></div>
+    </main>
+  </div>
+
+  <div class="modal-backdrop" id="modal-backdrop" hidden>
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="modal-titulo">Nova tarefa</h3>
+        <button class="icon-btn" id="modal-fechar" aria-label="Fechar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <input type="hidden" id="campo-id" />
+      <input type="hidden" id="campo-coluna" />
+
+      <div class="field">
+        <label for="campo-titulo">Título da tarefa *</label>
+        <input class="input" id="campo-titulo" placeholder="Ex: Ligar para follow-up da proposta" />
+      </div>
+
+      <div class="field">
+        <label for="campo-cliente">Cliente (opcional)</label>
+        <select class="input" id="campo-cliente">
+          <option value="">Nenhum</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="campo-prioridade">Prioridade</label>
+        <select class="input" id="campo-prioridade">
+          <option value="baixa">Baixa</option>
+          <option value="media" selected>Média</option>
+          <option value="alta">Alta</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="campo-responsavel">Responsável</label>
+        <select class="input" id="campo-responsavel"><option value="">Nenhum</option></select>
+      </div>
+
+      <div class="field">
+        <label for="campo-prazo">Prazo</label>
+        <input class="input" type="date" id="campo-prazo" />
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="modal-excluir" style="margin-right:auto; color:var(--danger); display:none;">Excluir tarefa</button>
+        <button class="btn btn-secondary" id="modal-cancelar">Cancelar</button>
+        <button class="btn btn-primary" id="modal-salvar">Salvar tarefa</button>
+      </div>
+    </div>
+  </div>
+
+  <script>const CTF_RAIZ = "../";</script>
+
+  <script src="../assets/js/utils.js"></script>
+  <script src="../assets/js/events.js"></script>
+  <script src="../assets/js/config.js"></script>
+  <script src="../assets/js/auth.js"></script>
+  <script src="../assets/js/db.js"></script>
+  <script src="../assets/js/catalogo-menu.js"></script>
+  <script src="../assets/js/partials.js"></script>
+  <script src="../assets/js/app-shell.js" defer></script>
+
+  <script defer>
+    const COLUNAS = [
+      { id: "fazer", label: "A Fazer" },
+      { id: "andamento", label: "Em Andamento" },
+      { id: "concluido", label: "Concluído" },
+    ];
+
+    function badgePrioridade(prioridade) {
+      const mapa = { alta: "badge--accent", media: "badge--warning", baixa: "badge--muted" };
+      const label = { alta: "Alta", media: "Média", baixa: "Baixa" };
+      return `<span class="badge ${mapa[prioridade] || "badge--muted"}">${label[prioridade] || prioridade}</span>`;
+    }
+
+    function cardTarefa(tarefa, indiceColuna) {
+      const cliente = tarefa.clienteId ? getPorId("clientes", tarefa.clienteId) : null;
+      const cor = cliente?.cor || "var(--border)";
+      const responsavel = tarefa.responsavelId ? getPorId("equipe", tarefa.responsavelId) : null;
+      const podeVoltar = indiceColuna > 0;
+      const podeAvancar = indiceColuna < COLUNAS.length - 1;
+      return `
+        <div class="task-card" style="border-left-color:${cor}" draggable="true" data-id="${tarefa.id}">
+          <div class="task-card-titulo">${tarefa.titulo}</div>
+          ${cliente ? `<div class="client-tag" style="margin-bottom:6px;"><span class="client-dot" style="background:${cor}"></span>${cliente.nome}</div>` : ""}
+          <div class="task-card-meta">
+            <div style="display:flex; align-items:center; gap:6px;">
+              ${badgePrioridade(tarefa.prioridade)}
+              ${tarefa.prazo ? `<span style="font-size:11px; color:var(--muted);">${formatarData(tarefa.prazo)}</span>` : ""}
+            </div>
+            ${responsavel ? `<div class="avatar" style="width:22px;height:22px;font-size:10px;" title="${responsavel.nome}">${iniciais(responsavel.nome)}</div>` : ""}
+          </div>
+          <div class="task-card-mover">
+            <button class="icon-btn" data-mover="${tarefa.id}" data-direcao="-1" ${podeVoltar ? "" : "disabled style='opacity:.3'"} title="Mover para trás">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+            </button>
+            <button class="icon-btn" data-editar="${tarefa.id}" title="Editar tarefa" style="flex:1;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
+            </button>
+            <button class="icon-btn" data-mover="${tarefa.id}" data-direcao="1" ${podeAvancar ? "" : "disabled style='opacity:.3'"} title="Mover para frente">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+            </button>
+          </div>
+        </div>`;
+    }
+
+    function renderizarQuadro() {
+      const tarefas = getAll("tarefasCrm");
+      document.getElementById("quadro").innerHTML = COLUNAS.map((coluna, indice) => {
+        const destaColuna = tarefas.filter((t) => t.coluna === coluna.id);
+        return `
+          <div class="kanban-coluna" data-coluna="${coluna.id}">
+            <div class="kanban-coluna-header">
+              <span class="kanban-coluna-titulo">${coluna.label} <span class="badge badge--muted">${destaColuna.length}</span></span>
+              <button class="icon-btn" data-nova-em="${coluna.id}" title="Adicionar tarefa">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 5v14M5 12h14"/></svg>
+              </button>
+            </div>
+            <div class="kanban-lista" data-coluna="${coluna.id}">
+              ${destaColuna.map((t) => cardTarefa(t, indice)).join("")}
+            </div>
+          </div>`;
+      }).join("");
+
+      ativarDragAndDrop();
+    }
+
+    function ativarDragAndDrop() {
+      document.querySelectorAll(".task-card").forEach((card) => {
+        card.addEventListener("dragstart", (e) => e.dataTransfer.setData("text/plain", card.dataset.id));
+      });
+      document.querySelectorAll(".kanban-coluna").forEach((coluna) => {
+        coluna.addEventListener("dragover", (e) => { e.preventDefault(); coluna.classList.add("arrastando-sobre"); });
+        coluna.addEventListener("dragleave", () => coluna.classList.remove("arrastando-sobre"));
+        coluna.addEventListener("drop", (e) => {
+          e.preventDefault();
+          coluna.classList.remove("arrastando-sobre");
+          const id = e.dataTransfer.getData("text/plain");
+          atualizar("tarefasCrm", id, { coluna: coluna.dataset.coluna });
+          renderizarQuadro();
+        });
+      });
+    }
+
+    function popularSelectClientes(clienteId) {
+      const select = document.getElementById("campo-cliente");
+      select.innerHTML =
+        '<option value="">Nenhum</option>' +
+        getAll("clientes")
+          .sort((a, b) => a.nome.localeCompare(b.nome))
+          .map((c) => `<option value="${c.id}" ${c.id === clienteId ? "selected" : ""}>${c.nome}</option>`)
+          .join("");
+    }
+
+    function popularSelectResponsavel(responsavelId) {
+      document.getElementById("campo-responsavel").innerHTML =
+        '<option value="">Nenhum</option>' + getAll("equipe")
+          .sort((a, b) => a.nome.localeCompare(b.nome))
+          .map((m) => `<option value="${m.id}" ${m.id === responsavelId ? "selected" : ""}>${m.nome}</option>`)
+          .join("");
+    }
+
+    function abrirModalNova(colunaId) {
+      popularSelectClientes(null);
+      popularSelectResponsavel(null);
+      document.getElementById("modal-titulo").textContent = "Nova tarefa";
+      document.getElementById("modal-excluir").style.display = "none";
+      document.getElementById("campo-id").value = "";
+      document.getElementById("campo-coluna").value = colunaId;
+      document.getElementById("campo-titulo").value = "";
+      document.getElementById("campo-prioridade").value = "media";
+      document.getElementById("campo-prazo").value = "";
+      document.getElementById("modal-backdrop").hidden = false;
+      document.getElementById("campo-titulo").focus();
+    }
+
+    function abrirModalEditar(id) {
+      const tarefa = getPorId("tarefasCrm", id);
+      popularSelectClientes(tarefa.clienteId);
+      popularSelectResponsavel(tarefa.responsavelId);
+      document.getElementById("modal-titulo").textContent = "Editar tarefa";
+      document.getElementById("modal-excluir").style.display = "inline-flex";
+      document.getElementById("campo-id").value = tarefa.id;
+      document.getElementById("campo-coluna").value = tarefa.coluna;
+      document.getElementById("campo-titulo").value = tarefa.titulo;
+      document.getElementById("campo-prioridade").value = tarefa.prioridade;
+      document.getElementById("campo-prazo").value = tarefa.prazo || "";
+      document.getElementById("modal-backdrop").hidden = false;
+      document.getElementById("campo-titulo").focus();
+    }
+
+    function fecharModal() {
+      document.getElementById("modal-backdrop").hidden = true;
+    }
+
+    function salvarTarefa() {
+      const id = document.getElementById("campo-id").value;
+      const titulo = document.getElementById("campo-titulo").value.trim();
+      if (!titulo) {
+        document.getElementById("campo-titulo").focus();
+        return;
+      }
+      const dados = {
+        titulo,
+        clienteId: document.getElementById("campo-cliente").value || null,
+        prioridade: document.getElementById("campo-prioridade").value,
+        responsavelId: document.getElementById("campo-responsavel").value || null,
+        prazo: document.getElementById("campo-prazo").value,
+        coluna: document.getElementById("campo-coluna").value,
+      };
+      if (id) atualizar("tarefasCrm", id, dados);
+      else inserir("tarefasCrm", dados);
+      fecharModal();
+      renderizarQuadro();
+    }
+
+    function moverTarefa(id, direcao) {
+      const tarefa = getPorId("tarefasCrm", id);
+      const indiceAtual = COLUNAS.findIndex((c) => c.id === tarefa.coluna);
+      const novoIndice = indiceAtual + direcao;
+      if (novoIndice < 0 || novoIndice >= COLUNAS.length) return;
+      atualizar("tarefasCrm", id, { coluna: COLUNAS[novoIndice].id });
+      renderizarQuadro();
+    }
+
+    window.addEventListener("ctf:shell-pronto", () => {
+      renderizarQuadro();
+      onDadosMudarem("tarefasCrm", renderizarQuadro);
+      onDadosMudarem("clientes", renderizarQuadro);
+      onDadosMudarem("equipe", renderizarQuadro);
+    });
+
+    document.getElementById("modal-fechar").addEventListener("click", fecharModal);
+    document.getElementById("modal-cancelar").addEventListener("click", fecharModal);
+    document.getElementById("modal-backdrop").addEventListener("click", (e) => {
+      if (e.target.id === "modal-backdrop") fecharModal();
+    });
+    document.getElementById("modal-salvar").addEventListener("click", salvarTarefa);
+    document.getElementById("modal-excluir").addEventListener("click", () => {
+      const id = document.getElementById("campo-id").value;
+      if (id && confirm("Excluir esta tarefa?")) {
+        remover("tarefasCrm", id);
+        fecharModal();
+        renderizarQuadro();
+      }
+    });
+
+    document.getElementById("botao-nova-tarefa").addEventListener("click", () => abrirModalNova("fazer"));
+
+    document.getElementById("quadro").addEventListener("click", (e) => {
+      const botaoNova = e.target.closest("[data-nova-em]");
+      if (botaoNova) return abrirModalNova(botaoNova.dataset.novaEm);
+      const botaoEditar = e.target.closest("[data-editar]");
+      if (botaoEditar) return abrirModalEditar(botaoEditar.dataset.editar);
+      const botaoMover = e.target.closest("[data-mover]");
+      if (botaoMover) return moverTarefa(botaoMover.dataset.mover, Number(botaoMover.dataset.direcao));
+    });
+  </script>
+</body>
+</html>

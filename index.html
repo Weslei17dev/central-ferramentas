@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Central de Ferramentas — Dashboard</title>
+
+  <!-- Aplica o tema salvo ANTES do CSS carregar, para não haver "flash" -->
+  <script>
+    document.documentElement.dataset.theme = localStorage.getItem("ctf_tema") || "dark";
+  </script>
+
+  <link rel="stylesheet" href="assets/css/tokens.css" />
+  <link rel="stylesheet" href="assets/css/base.css" />
+  <link rel="stylesheet" href="assets/css/components.css" />
+</head>
+<body data-module="dashboard">
+  <div class="app-shell">
+    <div id="app-sidebar"></div>
+    <div id="app-header"></div>
+
+    <main class="app-main">
+      <h1>Dashboard</h1>
+      <p style="color:var(--muted); margin-bottom:24px;">
+        Visão geral da Central de Ferramentas.
+      </p>
+
+      <div class="empty-state">
+        <h3>O shell está pronto ✅</h3>
+        <p>Header, sidebar, tema e dados-base já estão funcionando.</p>
+        <p>Os próximos módulos (Clientes e Projetos) vão aparecer aqui.</p>
+      </div>
+    </main>
+  </div>
+
+  <!-- Esta página está na RAIZ do projeto -->
+  <script>const CTF_RAIZ = "./";</script>
+
+  <!-- Ordem fixa em toda página: utils → events → db → partials → app-shell -->
+  <script src="assets/js/utils.js"></script>
+  <script src="assets/js/events.js"></script>
+  <script src="assets/js/config.js"></script>
+  <script src="assets/js/auth.js"></script>
+  <script src="assets/js/db.js"></script>
+  <script src="assets/js/catalogo-menu.js"></script>
+  <script src="assets/js/partials.js"></script>
+  <script src="assets/js/app-shell.js" defer></script>
+</body>
+</html>

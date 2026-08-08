@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Central de Ferramentas — Editar Portfólio</title>
+
+  <script>
+    document.documentElement.dataset.theme = localStorage.getItem("ctf_tema") || "dark";
+  </script>
+
+  <link rel="stylesheet" href="../assets/css/tokens.css" />
+  <link rel="stylesheet" href="../assets/css/base.css" />
+  <link rel="stylesheet" href="../assets/css/components.css" />
+</head>
+<body data-module="portfolio">
+  <div class="app-shell">
+    <div id="app-sidebar"></div>
+    <div id="app-header"></div>
+
+    <main class="app-main" style="max-width:720px;">
+      <div class="page-header">
+        <div>
+          <h1>Editar Portfólio</h1>
+          <p style="color:var(--muted)">O que você preencher aqui aparece na página pública.</p>
+        </div>
+        <a class="btn btn-secondary" href="index.html" target="_blank">Ver página pública ↗</a>
+      </div>
+
+      <div class="card" style="margin-bottom:20px;">
+        <div class="field">
+          <label for="campo-nome">Nome *</label>
+          <input class="input" id="campo-nome" placeholder="Seu nome" />
+        </div>
+        <div class="field">
+          <label for="campo-cargo">Cargo / título</label>
+          <input class="input" id="campo-cargo" placeholder="Ex: Desenvolvedor Full Stack" />
+        </div>
+        <div class="field">
+          <label for="campo-bio">Bio</label>
+          <textarea class="input code-editor" id="campo-bio" placeholder="Fale um pouco sobre você (aceita # título, **negrito**, *itálico*)"></textarea>
+        </div>
+        <div class="field">
+          <label for="campo-tecnologias">Tecnologias</label>
+          <input class="input" id="campo-tecnologias" placeholder="Separadas por vírgula: JavaScript, React, Node..." />
+        </div>
+        <div style="display:flex; gap:10px;">
+          <div class="field" style="flex:1;"><label for="campo-github">GitHub</label><input class="input" id="campo-github" placeholder="https://github.com/..." /></div>
+          <div class="field" style="flex:1;"><label for="campo-linkedin">LinkedIn</label><input class="input" id="campo-linkedin" placeholder="https://linkedin.com/in/..." /></div>
+          <div class="field" style="flex:1;"><label for="campo-blog">Blog</label><input class="input" id="campo-blog" placeholder="https://..." /></div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:20px;">
+        <div class="page-header" style="margin-bottom:14px;">
+          <h3 style="margin:0;">Experiência profissional</h3>
+          <button class="btn btn-secondary" id="add-experiencia">+ Adicionar</button>
+        </div>
+        <div id="lista-experiencias"></div>
+      </div>
+
+      <div class="card" style="margin-bottom:20px;">
+        <div class="page-header" style="margin-bottom:14px;">
+          <h3 style="margin:0;">Certificados</h3>
+          <button class="btn btn-secondary" id="add-certificado">+ Adicionar</button>
+        </div>
+        <div id="lista-certificados"></div>
+      </div>
+
+      <div class="card" style="margin-bottom:20px;">
+        <div class="page-header" style="margin-bottom:14px;">
+          <h3 style="margin:0;">Projetos em destaque</h3>
+          <div style="display:flex; gap:8px;">
+            <select class="input" id="select-importar-projeto" style="max-width:200px;"><option value="">Importar de Projetos...</option></select>
+            <button class="btn btn-secondary" id="add-projeto">+ Adicionar</button>
+          </div>
+        </div>
+        <div id="lista-projetos"></div>
+      </div>
+
+      <button class="btn btn-primary" id="botao-salvar" style="width:100%; height:44px;">Salvar portfólio</button>
+    </main>
+  </div>
+
+  <script>const CTF_RAIZ = "../";</script>
+
+  <script src="../assets/js/utils.js"></script>
+  <script src="../assets/js/events.js"></script>
+  <script src="../assets/js/config.js"></script>
+  <script src="../assets/js/auth.js"></script>
+  <script src="../assets/js/db.js"></script>
+  <script src="../assets/js/catalogo-menu.js"></script>
+  <script src="../assets/js/partials.js"></script>
+  <script src="../assets/js/app-shell.js" defer></script>
+
+  <script defer>
+    function linhaExperiencia(dados = {}) {
+      const div = document.createElement("div");
+      div.className = "linha-editavel";
+      div.innerHTML = `
+        <button class="icon-btn remover-linha" title="Remover">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+        <div style="display:flex; gap:10px;">
+          <input class="input campo-cargo" placeholder="Cargo" value="${dados.cargo || ""}" style="flex:1;" />
+          <input class="input campo-empresa" placeholder="Empresa" value="${dados.empresa || ""}" style="flex:1;" />
+        </div>
+        <input class="input campo-periodo" placeholder="Período (ex: 2023 — atual)" value="${dados.periodo || ""}" style="margin-top:8px;" />
+        <textarea class="input campo-descricao" placeholder="Descrição breve" style="margin-top:8px;" rows="2">${dados.descricao || ""}</textarea>`;
+      div.querySelector(".remover-linha").addEventListener("click", () => div.remove());
+      return div;
+    }
+
+    function linhaCertificado(dados = {}) {
+      const div = document.createElement("div");
+      div.className = "linha-editavel";
+      div.innerHTML = `
+        <button class="icon-btn remover-linha" title="Remover">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+        <div style="display:flex; gap:10px;">
+          <input class="input campo-nome" placeholder="Nome do certificado" value="${dados.nome || ""}" style="flex:2;" />
+          <input class="input campo-instituicao" placeholder="Instituição" value="${dados.instituicao || ""}" style="flex:2;" />
+          <input class="input campo-ano" placeholder="Ano" value="${dados.ano || ""}" style="flex:1;" />
+        </div>`;
+      div.querySelector(".remover-linha").addEventListener("click", () => div.remove());
+      return div;
+    }
+
+    function linhaProjeto(dados = {}) {
+      const div = document.createElement("div");
+      div.className = "linha-editavel";
+      div.innerHTML = `
+        <button class="icon-btn remover-linha" title="Remover">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+        <input class="input campo-nome" placeholder="Nome do projeto" value="${dados.nome || ""}" />
+        <textarea class="input campo-descricao" placeholder="Descrição breve" style="margin-top:8px;" rows="2">${dados.descricao || ""}</textarea>
+        <input class="input campo-link" placeholder="Link (opcional)" value="${dados.link || ""}" style="margin-top:8px;" />`;
+      div.querySelector(".remover-linha").addEventListener("click", () => div.remove());
+      return div;
+    }
+
+    function carregarFormulario() {
+      const p = getPortfolio();
+      document.getElementById("campo-nome").value = p.nome || "";
+      document.getElementById("campo-cargo").value = p.cargo || "";
+      document.getElementById("campo-bio").value = p.bio || "";
+      document.getElementById("campo-tecnologias").value = (p.tecnologias || []).join(", ");
+      document.getElementById("campo-github").value = p.links?.github || "";
+      document.getElementById("campo-linkedin").value = p.links?.linkedin || "";
+      document.getElementById("campo-blog").value = p.links?.blog || "";
+
+      const expEl = document.getElementById("lista-experiencias"); expEl.innerHTML = "";
+      (p.experiencias || []).forEach((e) => expEl.appendChild(linhaExperiencia(e)));
+
+      const certEl = document.getElementById("lista-certificados"); certEl.innerHTML = "";
+      (p.certificados || []).forEach((c) => certEl.appendChild(linhaCertificado(c)));
+
+      const projEl = document.getElementById("lista-projetos"); projEl.innerHTML = "";
+      (p.projetosDestaque || []).forEach((pr) => projEl.appendChild(linhaProjeto(pr)));
+
+      document.getElementById("select-importar-projeto").innerHTML =
+        '<option value="">Importar de Projetos...</option>' +
+        getAll("projetos").map((proj) => `<option value="${proj.id}">${proj.nome}</option>`).join("");
+    }
+
+    function coletarLinhas(containerId, campos) {
+      return Array.from(document.getElementById(containerId).children).map((linha) => {
+        const obj = {};
+        campos.forEach((c) => { obj[c] = linha.querySelector(`.campo-${c}`).value.trim(); });
+        return obj;
+      }).filter((obj) => Object.values(obj).some(Boolean));
+    }
+
+    function salvar() {
+      const nome = document.getElementById("campo-nome").value.trim();
+      if (!nome) { document.getElementById("campo-nome").focus(); return; }
+
+      salvarPortfolio({
+        nome,
+        cargo: document.getElementById("campo-cargo").value.trim(),
+        bio: document.getElementById("campo-bio").value,
+        tecnologias: document.getElementById("campo-tecnologias").value.split(",").map((t) => t.trim()).filter(Boolean),
+        links: {
+          github: document.getElementById("campo-github").value.trim(),
+          linkedin: document.getElementById("campo-linkedin").value.trim(),
+          blog: document.getElementById("campo-blog").value.trim(),
+        },
+        experiencias: coletarLinhas("lista-experiencias", ["cargo", "empresa", "periodo", "descricao"]),
+        certificados: coletarLinhas("lista-certificados", ["nome", "instituicao", "ano"]),
+        projetosDestaque: coletarLinhas("lista-projetos", ["nome", "descricao", "link"]),
+      });
+
+      const botao = document.getElementById("botao-salvar");
+      const original = botao.textContent;
+      botao.textContent = "Salvo!";
+      setTimeout(() => { botao.textContent = original; }, 1500);
+    }
+
+    window.addEventListener("ctf:shell-pronto", carregarFormulario);
+
+    document.getElementById("add-experiencia").addEventListener("click", () => document.getElementById("lista-experiencias").appendChild(linhaExperiencia()));
+    document.getElementById("add-certificado").addEventListener("click", () => document.getElementById("lista-certificados").appendChild(linhaCertificado()));
+    document.getElementById("add-projeto").addEventListener("click", () => document.getElementById("lista-projetos").appendChild(linhaProjeto()));
+
+    document.getElementById("select-importar-projeto").addEventListener("change", (e) => {
+      const id = e.target.value;
+      if (!id) return;
+      const projeto = getPorId("projetos", id);
+      document.getElementById("lista-projetos").appendChild(linhaProjeto({ nome: projeto.nome, descricao: "", link: "" }));
+      e.target.value = "";
+    });
+
+    document.getElementById("botao-salvar").addEventListener("click", salvar);
+  </script>
+</body>
+</html>

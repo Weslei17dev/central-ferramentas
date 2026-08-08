@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Central de Ferramentas — Perfil</title>
+
+  <script>
+    document.documentElement.dataset.theme = localStorage.getItem("ctf_tema") || "dark";
+  </script>
+
+  <link rel="stylesheet" href="../assets/css/tokens.css" />
+  <link rel="stylesheet" href="../assets/css/base.css" />
+  <link rel="stylesheet" href="../assets/css/components.css" />
+</head>
+<body data-module="perfil">
+  <div class="app-shell">
+    <div id="app-sidebar"></div>
+    <div id="app-header"></div>
+
+    <main class="app-main" style="max-width:520px;">
+      <div class="page-header">
+        <div>
+          <h1>Perfil</h1>
+          <p style="color:var(--muted)">Como você aparece no avatar do header e da sidebar.</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <div style="display:flex; align-items:center; gap:16px; margin-bottom:20px;">
+          <div class="avatar" id="preview-avatar" style="width:56px; height:56px; font-size:18px;">VC</div>
+          <div>
+            <div style="font-weight:600;" id="preview-nome">Você</div>
+            <div style="font-size:12px; color:var(--muted);" id="preview-cargo"></div>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="campo-nome">Nome *</label>
+          <input class="input" id="campo-nome" placeholder="Seu nome" />
+        </div>
+        <div class="field">
+          <label for="campo-cargo">Cargo / função (opcional)</label>
+          <input class="input" id="campo-cargo" placeholder="Ex: Fundador, Gerente de Projetos..." />
+        </div>
+
+        <button class="btn btn-primary" id="botao-salvar" style="width:100%; height:40px;">Salvar</button>
+      </div>
+    </main>
+  </div>
+
+  <script>const CTF_RAIZ = "../";</script>
+
+  <script src="../assets/js/utils.js"></script>
+  <script src="../assets/js/events.js"></script>
+  <script src="../assets/js/config.js"></script>
+  <script src="../assets/js/auth.js"></script>
+  <script src="../assets/js/db.js"></script>
+  <script src="../assets/js/catalogo-menu.js"></script>
+  <script src="../assets/js/partials.js"></script>
+  <script src="../assets/js/app-shell.js" defer></script>
+
+  <script defer>
+    function atualizarPreview() {
+      const nome = document.getElementById("campo-nome").value.trim() || "Você";
+      const cargo = document.getElementById("campo-cargo").value.trim();
+      document.getElementById("preview-avatar").textContent = iniciais(nome);
+      document.getElementById("preview-nome").textContent = nome;
+      document.getElementById("preview-cargo").textContent = cargo;
+    }
+
+    function carregarFormulario() {
+      const perfil = getPerfil();
+      document.getElementById("campo-nome").value = perfil.nome || "";
+      document.getElementById("campo-cargo").value = perfil.cargo || "";
+      atualizarPreview();
+    }
+
+    function salvar() {
+      const nome = document.getElementById("campo-nome").value.trim();
+      if (!nome) { document.getElementById("campo-nome").focus(); return; }
+      salvarPerfil({ nome, cargo: document.getElementById("campo-cargo").value.trim() });
+      const botao = document.getElementById("botao-salvar");
+      const original = botao.textContent;
+      botao.textContent = "Salvo!";
+      setTimeout(() => { botao.textContent = original; }, 1500);
+    }
+
+    window.addEventListener("ctf:shell-pronto", carregarFormulario);
+    document.getElementById("campo-nome").addEventListener("input", atualizarPreview);
+    document.getElementById("campo-cargo").addEventListener("input", atualizarPreview);
+    document.getElementById("botao-salvar").addEventListener("click", salvar);
+  </script>
+</body>
+</html>

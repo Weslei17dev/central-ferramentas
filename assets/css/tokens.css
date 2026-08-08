@@ -1,0 +1,77 @@
+/* ==========================================================================
+   TOKENS.CSS
+   Fonte única da verdade do visual do sistema. Nenhum outro arquivo deve
+   declarar cor, fonte ou raio de borda "fixo" — sempre usar estas variáveis,
+   para que todo módulo novo herde a identidade da plataforma automaticamente.
+   ========================================================================== */
+
+:root,
+[data-theme="dark"] {
+  /* --- Superfícies --- */
+  --bg: #121316;            /* fundo geral da página */
+  --surface: #1B1D22;       /* cards, painéis */
+  --surface-alt: #232630;   /* sidebar, elementos elevados */
+  --surface-hover: #2A2D38;
+  --border: #2C2F38;
+
+  /* --- Texto --- */
+  --ink: #F2F3F5;
+  --ink-soft: #C7CAD1;
+  --muted: #9AA0AC;
+
+  /* --- Marca --- */
+  --accent: #E5484D;        /* vermelho — cor de marca (ações, ativo, links) */
+  --accent-hover: #F16F73;
+  --accent-ink: #FFFFFF;    /* texto sobre --accent */
+  --accent-soft: #3B1E1F;   /* fundo suave p/ badges/seleção */
+
+  /* --- Estados (nunca usar --accent para isto) --- */
+  --warning: #D9962B;
+  --warning-soft: #3A2C15;
+  --success: #3FB27F;
+  --success-soft: #163226;
+  --danger: #C4302B;        /* erro real — mais escuro/dessaturado que --accent */
+  --danger-soft: #33191A;
+
+  /* --- Layout --- */
+  --radius-sm: 6px;
+  --radius: 10px;
+  --radius-lg: 16px;
+  --sidebar-w: 268px;
+  --header-h: 64px;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.35);
+
+  /* --- Tipografia --- */
+  --font-display: "Space Grotesk", "Inter", sans-serif;
+  --font-body: "Inter", -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
+/* Tema claro — ativado manualmente via [data-theme="light"] no <html> */
+[data-theme="light"] {
+  --bg: #F6F7F9;
+  --surface: #FFFFFF;
+  --surface-alt: #FFFFFF;
+  --surface-hover: #F0F1F4;
+  --border: #E4E6EB;
+
+  --ink: #14161C;
+  --ink-soft: #383C46;
+  --muted: #6B7280;
+
+  --accent: #D93A3F;
+  --accent-hover: #C4292E;
+  --accent-ink: #FFFFFF;
+  --accent-soft: #FCEAEA;
+
+  --warning: #B8791F;
+  --warning-soft: #FBF0DE;
+  --success: #1E8E5F;
+  --success-soft: #E4F5EC;
+  --danger: #C4292E;
+  --danger-soft: #FBEAEA;
+
+  --shadow-sm: 0 1px 2px rgba(20, 22, 28, 0.06);
+  --shadow-md: 0 8px 24px rgba(20, 22, 28, 0.08);
+}

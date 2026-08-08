@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Central de Ferramentas — Métricas</title>
+
+  <script>
+    document.documentElement.dataset.theme = localStorage.getItem("ctf_tema") || "dark";
+  </script>
+
+  <link rel="stylesheet" href="../assets/css/tokens.css" />
+  <link rel="stylesheet" href="../assets/css/base.css" />
+  <link rel="stylesheet" href="../assets/css/components.css" />
+</head>
+<body data-module="relatorios-metricas">
+  <div class="app-shell">
+    <div id="app-sidebar"></div>
+    <div id="app-header"></div>
+
+    <main class="app-main">
+      <div class="page-header">
+        <div>
+          <h1>Métricas</h1>
+          <p style="color:var(--muted)">Medidas reutilizáveis — uma agregação sobre uma tabela, com filtro opcional. Usadas nos blocos do Construtor de Relatórios.</p>
+        </div>
+        <button class="btn btn-primary" id="botao-nova-metrica">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 5v14M5 12h14"/></svg>
+          Nova métrica
+        </button>
+      </div>
+
+      <div id="lista-metricas" class="grid-cards"></div>
+      <div id="estado-vazio" class="empty-state" hidden>
+        <h3>Nenhuma métrica criada ainda</h3>
+        <p>Ex: "Faturamento pago" = Soma de Valor em Financeiro, onde Status = pago.</p>
+      </div>
+    </main>
+  </div>
+
+  <div class="modal-backdrop" id="modal-backdrop" hidden>
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="modal-titulo">Nova métrica</h3>
+        <button class="icon-btn" id="modal-fechar" aria-label="Fechar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <input type="hidden" id="campo-id" />
+
+      <div class="field">
+        <label for="campo-nome">Nome da métrica *</label>
+        <input class="input" id="campo-nome" placeholder="Ex: Faturamento pago" />
+      </div>
+
+      <div class="field">
+        <label for="campo-tabela">Tabela *</label>
+        <select class="input" id="campo-tabela"></select>
+      </div>
+
+      <div style="display:flex; gap:10px;">
+        <div class="field" style="flex:1;">
+          <label for="campo-agregacao">Agregação *</label>
+          <select class="input" id="campo-agregacao"></select>
+        </div>
+        <div class="field" style="flex:1;">
+          <label for="campo-campo">Campo numérico</label>
+          <select class="input" id="campo-campo"><option value="">— (usar com Contagem) —</option></select>
+        </div>
+      </div>
+
+      <p class="subsection-title" style="margin-top:6px;">Filtro (opcional)</p>
+      <div style="display:flex; gap:8px;">
+        <select class="input" id="filtro-campo" style="flex:1.4;"><option value="">Sem filtro</option></select>
+        <select class="input" id="filtro-operador" style="flex:1;">
+          <option value="igual">é igual a</option>
+          <option value="diferente">é diferente de</option>
+          <option value="maior">é maior que</option>
+          <option value="menor">é menor que</option>
+        </select>
+        <input class="input" id="filtro-valor" placeholder="valor" style="flex:1;" />
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="modal-excluir" style="margin-right:auto; color:var(--danger); display:none;">Excluir</button>
+        <button class="btn btn-secondary" id="modal-cancelar">Cancelar</button>
+        <button class="btn btn-primary" id="modal-salvar">Salvar métrica</button>
+      </div>
+    </div>
+  </div>
+
+  <script>const CTF_RAIZ = "../";</script>
+
+  <script src="../assets/js/utils.js"></script>
+  <script src="../assets/js/events.js"></script>
+  <script src="../assets/js/config.js"></script>
+  <script src="../assets/js/auth.js"></script>
+  <script src="../assets/js/db.js"></script>
+  <script src="../assets/js/catalogo-relatorios.js"></script>
+  <script src="../assets/js/catalogo-menu.js"></script>
+  <script src="../assets/js/partials.js"></script>
+  <script src="../assets/js/app-shell.js" defer></script>
+
+  <script defer>
+    function descreverMetrica(m) {
+      const tabela = obterTabelaCatalogo(m.tabela);
+      const campo = obterCampoCatalogo(m.tabela, m.campo);
+      const agregacao = AGREGACOES.find((a) => a.chave === m.agregacao);
+      let texto = `${agregacao?.rotulo || m.agregacao}`;
+      if (m.campo) texto += ` de ${campo?.rotulo || m.campo}`;
+      texto += ` em ${tabela?.rotulo || m.tabela}`;
+      if (m.filtroCampo) {
+        const campoFiltro = obterCampoCatalogo(m.tabela, m.filtroCampo);
+        const op = { igual: "=", diferente: "≠", maior: ">", menor: "<" }[m.filtroOperador];
+        texto += ` — onde ${campoFiltro?.rotulo || m.filtroCampo} ${op} "${m.filtroValor}"`;
+      }
+      return texto;
+    }
+
+    function cardMetrica(m) {
+      let resultado;
+      try { resultado = calcularAgregacao(m.tabela, m.campo, m.agregacao, m.filtroCampo ? { campo: m.filtroCampo, operador: m.filtroOperador, valor: m.filtroValor } : null); }
+      catch { resultado = "—"; }
+
+      return `
+        <div class="card">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
+            <strong style="font-size:14px;">${m.nome}</strong>
+            <div style="display:flex; gap:2px;">
+              <button class="icon-btn" data-acao="editar" data-id="${m.id}" title="Editar">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
+              </button>
+              <button class="icon-btn excluir" data-acao="excluir" data-id="${m.id}" title="Excluir">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m2 0-1 14a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1L5 6"/></svg>
+              </button>
+            </div>
+          </div>
+          <p style="font-size:12px; color:var(--muted); margin-top:6px;">${descreverMetrica(m)}</p>
+          <p class="bloco-kpi-valor" style="font-size:24px; margin-top:10px;">${typeof resultado === "number" ? (Number.isInteger(resultado) ? resultado : resultado.toFixed(2)) : resultado}</p>
+        </div>`;
+    }
+
+    function renderizarMetricas() {
+      const metricas = getAll("metricas").sort((a, b) => a.nome.localeCompare(b.nome));
+      document.getElementById("lista-metricas").innerHTML = metricas.map(cardMetrica).join("");
+      document.getElementById("estado-vazio").hidden = metricas.length !== 0;
+    }
+
+    function popularCamposDoFormulario(tabelaSelecionada, campoSelecionado, filtroCampoSelecionado) {
+      document.getElementById("campo-tabela").innerHTML = CATALOGO_TABELAS
+        .map((t) => `<option value="${t.tabela}" ${t.tabela === tabelaSelecionada ? "selected" : ""}>${t.rotulo}</option>`).join("");
+
+      const def = obterTabelaCatalogo(tabelaSelecionada || CATALOGO_TABELAS[0].tabela);
+      const camposNumericos = def.campos.filter((c) => c.tipo === "numero");
+      document.getElementById("campo-campo").innerHTML =
+        '<option value="">— (usar com Contagem) —</option>' +
+        camposNumericos.map((c) => `<option value="${c.chave}" ${c.chave === campoSelecionado ? "selected" : ""}>${c.rotulo}</option>`).join("");
+
+      document.getElementById("filtro-campo").innerHTML =
+        '<option value="">Sem filtro</option>' +
+        def.campos.map((c) => `<option value="${c.chave}" ${c.chave === filtroCampoSelecionado ? "selected" : ""}>${c.rotulo}</option>`).join("");
+    }
+
+    document.getElementById("campo-agregacao").innerHTML = AGREGACOES.map((a) => `<option value="${a.chave}">${a.rotulo}</option>`).join("");
+    document.getElementById("campo-tabela").addEventListener("change", (e) => popularCamposDoFormulario(e.target.value));
+
+    function abrirModal(metrica = null) {
+      document.getElementById("modal-titulo").textContent = metrica ? "Editar métrica" : "Nova métrica";
+      document.getElementById("modal-excluir").style.display = metrica ? "inline-flex" : "none";
+      document.getElementById("campo-id").value = metrica?.id || "";
+      document.getElementById("campo-nome").value = metrica?.nome || "";
+      popularCamposDoFormulario(metrica?.tabela, metrica?.campo, metrica?.filtroCampo);
+      document.getElementById("campo-agregacao").value = metrica?.agregacao || "contagem";
+      document.getElementById("filtro-operador").value = metrica?.filtroOperador || "igual";
+      document.getElementById("filtro-valor").value = metrica?.filtroValor || "";
+      document.getElementById("modal-backdrop").hidden = false;
+      document.getElementById("campo-nome").focus();
+    }
+    function fecharModal() { document.getElementById("modal-backdrop").hidden = true; }
+
+    function salvarMetrica() {
+      const id = document.getElementById("campo-id").value;
+      const nome = document.getElementById("campo-nome").value.trim();
+      if (!nome) { document.getElementById("campo-nome").focus(); return; }
+      const dados = {
+        nome,
+        tabela: document.getElementById("campo-tabela").value,
+        campo: document.getElementById("campo-campo").value || null,
+        agregacao: document.getElementById("campo-agregacao").value,
+        filtroCampo: document.getElementById("filtro-campo").value || null,
+        filtroOperador: document.getElementById("filtro-operador").value,
+        filtroValor: document.getElementById("filtro-valor").value.trim(),
+      };
+      if (id) atualizar("metricas", id, dados);
+      else inserir("metricas", dados);
+      fecharModal();
+      renderizarMetricas();
+    }
+
+    function excluirMetrica(id) {
+      const metrica = getPorId("metricas", id);
+      if (confirm(`Excluir a métrica "${metrica.nome}"? Blocos de relatório que a usam vão parar de funcionar.`)) {
+        remover("metricas", id);
+        renderizarMetricas();
+      }
+    }
+
+    window.addEventListener("ctf:shell-pronto", () => {
+      renderizarMetricas();
+      onDadosMudarem("metricas", renderizarMetricas);
+    });
+
+    document.getElementById("botao-nova-metrica").addEventListener("click", () => abrirModal());
+    document.getElementById("modal-fechar").addEventListener("click", fecharModal);
+    document.getElementById("modal-cancelar").addEventListener("click", fecharModal);
+    document.getElementById("modal-backdrop").addEventListener("click", (e) => { if (e.target.id === "modal-backdrop") fecharModal(); });
+    document.getElementById("modal-salvar").addEventListener("click", salvarMetrica);
+    document.getElementById("modal-excluir").addEventListener("click", () => {
+      const id = document.getElementById("campo-id").value;
+      fecharModal();
+      if (id) excluirMetrica(id);
+    });
+
+    document.getElementById("lista-metricas").addEventListener("click", (e) => {
+      const botao = e.target.closest("[data-acao]");
+      if (!botao) return;
+      const id = botao.dataset.id;
+      if (botao.dataset.acao === "editar") abrirModal(getPorId("metricas", id));
+      if (botao.dataset.acao === "excluir") excluirMetrica(id);
+    });
+  </script>
+</body>
+</html>

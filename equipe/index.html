@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Central de Ferramentas — Equipe</title>
+
+  <script>
+    document.documentElement.dataset.theme = localStorage.getItem("ctf_tema") || "dark";
+  </script>
+
+  <link rel="stylesheet" href="../assets/css/tokens.css" />
+  <link rel="stylesheet" href="../assets/css/base.css" />
+  <link rel="stylesheet" href="../assets/css/components.css" />
+</head>
+<body data-module="equipe">
+  <div class="app-shell">
+    <div id="app-sidebar"></div>
+    <div id="app-header"></div>
+
+    <main class="app-main">
+      <div class="page-header">
+        <div>
+          <h1>Equipe</h1>
+          <p style="color:var(--muted)">Cadastro de membros — usado como responsável em Projetos e, futuramente, em outros módulos.</p>
+        </div>
+        <button class="btn btn-primary" id="botao-novo-membro">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 5v14M5 12h14"/></svg>
+          Novo membro
+        </button>
+      </div>
+
+      <div id="lista-equipe" class="grid-cards"></div>
+      <div id="estado-vazio" class="empty-state" hidden>
+        <h3>Nenhum membro cadastrado</h3>
+        <p>Cadastre o primeiro membro da equipe.</p>
+      </div>
+    </main>
+  </div>
+
+  <div class="modal-backdrop" id="modal-backdrop" hidden>
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="modal-titulo">Novo membro</h3>
+        <button class="icon-btn" id="modal-fechar" aria-label="Fechar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <input type="hidden" id="campo-id" />
+
+      <div class="field">
+        <label for="campo-nome">Nome *</label>
+        <input class="input" id="campo-nome" placeholder="Ex: Ana Souza" />
+      </div>
+      <div class="field">
+        <label for="campo-cargo">Cargo / função</label>
+        <input class="input" id="campo-cargo" placeholder="Ex: Designer, Desenvolvedor..." />
+      </div>
+      <div class="field">
+        <label for="campo-contato">Contato (opcional)</label>
+        <input class="input" id="campo-contato" placeholder="E-mail ou telefone" />
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="modal-excluir" style="margin-right:auto; color:var(--danger); display:none;">Excluir</button>
+        <button class="btn btn-secondary" id="modal-cancelar">Cancelar</button>
+        <button class="btn btn-primary" id="modal-salvar">Salvar membro</button>
+      </div>
+    </div>
+  </div>
+
+  <script>const CTF_RAIZ = "../";</script>
+
+  <script src="../assets/js/utils.js"></script>
+  <script src="../assets/js/events.js"></script>
+  <script src="../assets/js/config.js"></script>
+  <script src="../assets/js/auth.js"></script>
+  <script src="../assets/js/db.js"></script>
+  <script src="../assets/js/catalogo-menu.js"></script>
+  <script src="../assets/js/partials.js"></script>
+  <script src="../assets/js/app-shell.js" defer></script>
+
+  <script defer>
+    let filtroTexto = "";
+
+    function tarefasAtivas(membroId) {
+      const colunas = getAll("kanbanColunas");
+      const ultimaColuna = colunas[colunas.length - 1];
+      return getAll("tarefas").filter((t) => t.responsavelId === membroId && t.coluna !== ultimaColuna?.id).length;
+    }
+
+    function cardMembro(membro) {
+      const ativas = tarefasAtivas(membro.id);
+      return `
+        <div class="card">
+          <div style="display:flex; gap:12px; align-items:center;">
+            <div class="avatar" style="width:40px; height:40px; font-size:13px;">${iniciais(membro.nome)}</div>
+            <div style="flex:1; min-width:0;">
+              <strong style="font-size:14px;">${membro.nome}</strong>
+              <div style="font-size:12px; color:var(--muted);">${membro.cargo || "Sem cargo definido"}</div>
+            </div>
+            <div style="text-align:right;">
+              <div style="font-size:20px; font-weight:700; font-family:var(--font-display);">${ativas}</div>
+              <div style="font-size:10px; color:var(--muted); text-transform:uppercase;">ativas</div>
+            </div>
+            <div style="display:flex; gap:2px;">
+              <button class="icon-btn" data-acao="editar" data-id="${membro.id}" title="Editar">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
+              </button>
+              <button class="icon-btn excluir" data-acao="excluir" data-id="${membro.id}" title="Excluir">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m2 0-1 14a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1L5 6"/></svg>
+              </button>
+            </div>
+          </div>
+          ${membro.contato ? `<p style="margin-top:10px; font-size:12px; color:var(--muted);">${membro.contato}</p>` : ""}
+        </div>`;
+    }
+
+    function renderizarEquipe() {
+      const membros = getAll("equipe")
+        .filter((m) => m.nome.toLowerCase().includes(filtroTexto.toLowerCase()))
+        .sort((a, b) => a.nome.localeCompare(b.nome));
+      const lista = document.getElementById("lista-equipe");
+      const vazio = document.getElementById("estado-vazio");
+      lista.innerHTML = membros.map(cardMembro).join("");
+      vazio.hidden = membros.length !== 0;
+    }
+
+    function abrirModal(membro = null) {
+      document.getElementById("modal-titulo").textContent = membro ? "Editar membro" : "Novo membro";
+      document.getElementById("modal-excluir").style.display = membro ? "inline-flex" : "none";
+      document.getElementById("campo-id").value = membro?.id || "";
+      document.getElementById("campo-nome").value = membro?.nome || "";
+      document.getElementById("campo-cargo").value = membro?.cargo || "";
+      document.getElementById("campo-contato").value = membro?.contato || "";
+      document.getElementById("modal-backdrop").hidden = false;
+      document.getElementById("campo-nome").focus();
+    }
+    function fecharModal() { document.getElementById("modal-backdrop").hidden = true; }
+
+    function salvarMembro() {
+      const id = document.getElementById("campo-id").value;
+      const nome = document.getElementById("campo-nome").value.trim();
+      if (!nome) { document.getElementById("campo-nome").focus(); return; }
+      const dados = {
+        nome,
+        cargo: document.getElementById("campo-cargo").value.trim(),
+        contato: document.getElementById("campo-contato").value.trim(),
+      };
+      if (id) atualizar("equipe", id, dados);
+      else inserir("equipe", dados);
+      fecharModal();
+      renderizarEquipe();
+    }
+
+    function excluirMembro(id) {
+      const membro = getPorId("equipe", id);
+      if (confirm(`Excluir "${membro.nome}" da equipe? Tarefas já atribuídas a ele continuam existindo, só ficam sem responsável.`)) {
+        remover("equipe", id);
+        renderizarEquipe();
+      }
+    }
+
+    window.addEventListener("ctf:shell-pronto", () => {
+      renderizarEquipe();
+      document.getElementById("busca-global")?.addEventListener("input", (e) => {
+        filtroTexto = e.target.value;
+        renderizarEquipe();
+      });
+      onDadosMudarem("equipe", renderizarEquipe);
+      onDadosMudarem("tarefas", renderizarEquipe);
+    });
+
+    document.getElementById("botao-novo-membro").addEventListener("click", () => abrirModal());
+    document.getElementById("modal-fechar").addEventListener("click", fecharModal);
+    document.getElementById("modal-cancelar").addEventListener("click", fecharModal);
+    document.getElementById("modal-backdrop").addEventListener("click", (e) => { if (e.target.id === "modal-backdrop") fecharModal(); });
+    document.getElementById("modal-salvar").addEventListener("click", salvarMembro);
+    document.getElementById("modal-excluir").addEventListener("click", () => {
+      const id = document.getElementById("campo-id").value;
+      fecharModal();
+      if (id) excluirMembro(id);
+    });
+
+    document.getElementById("lista-equipe").addEventListener("click", (e) => {
+      const botao = e.target.closest("[data-acao]");
+      if (!botao) return;
+      const id = botao.dataset.id;
+      if (botao.dataset.acao === "editar") abrirModal(getPorId("equipe", id));
+      if (botao.dataset.acao === "excluir") excluirMembro(id);
+    });
+  </script>
+</body>
+</html>

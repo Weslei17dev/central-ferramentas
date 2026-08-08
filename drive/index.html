@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Central de Ferramentas — Drive de Arquivos</title>
+
+  <script>
+    document.documentElement.dataset.theme = localStorage.getItem("ctf_tema") || "dark";
+  </script>
+
+  <link rel="stylesheet" href="../assets/css/tokens.css" />
+  <link rel="stylesheet" href="../assets/css/base.css" />
+  <link rel="stylesheet" href="../assets/css/components.css" />
+</head>
+<body data-module="drive">
+  <div class="app-shell">
+    <div id="app-sidebar"></div>
+    <div id="app-header"></div>
+
+    <main class="app-main">
+      <div class="page-header">
+        <div>
+          <h1>Drive de Arquivos</h1>
+          <p style="color:var(--muted)">PDF, Excel, Word, imagens — organizados por cliente, projeto, categoria e tags.</p>
+        </div>
+        <button class="btn btn-primary" id="botao-enviar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v12m0 0-4-4m4 4 4-4"/><path d="M4.5 15.5v3a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-3"/></svg>
+          Enviar arquivo
+        </button>
+        <input type="file" id="input-arquivo" hidden />
+      </div>
+
+      <div style="display:flex; gap:10px; margin-bottom:18px; flex-wrap:wrap;">
+        <select class="input" id="filtro-cliente" style="max-width:220px;">
+          <option value="">Todos os clientes</option>
+        </select>
+        <select class="input" id="filtro-projeto" style="max-width:220px;">
+          <option value="">Todos os projetos</option>
+        </select>
+      </div>
+
+      <div id="lista-arquivos" class="grid-cards"></div>
+      <div id="estado-vazio" class="empty-state" hidden>
+        <h3>Nenhum arquivo encontrado</h3>
+        <p>Clique em "Enviar arquivo" para adicionar o primeiro.</p>
+      </div>
+    </main>
+  </div>
+
+  <!-- Modal: metadados do arquivo enviado -->
+  <div class="modal-backdrop" id="modal-backdrop" hidden>
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Detalhes do arquivo</h3>
+        <button class="icon-btn" id="modal-fechar" aria-label="Fechar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <p id="modal-arquivo-nome" style="font-weight:600; margin-bottom:14px;"></p>
+      <input type="hidden" id="campo-id" />
+
+      <div class="field">
+        <label for="campo-cliente">Cliente (opcional)</label>
+        <select class="input" id="campo-cliente"><option value="">Nenhum</option></select>
+      </div>
+      <div class="field">
+        <label for="campo-projeto">Projeto (opcional)</label>
+        <select class="input" id="campo-projeto"><option value="">Nenhum</option></select>
+      </div>
+      <div class="field">
+        <label for="campo-categoria">Categoria</label>
+        <input class="input" id="campo-categoria" placeholder="Ex: Contrato, Briefing, Logo..." />
+      </div>
+      <div class="field">
+        <label for="campo-tags">Tags</label>
+        <input class="input" id="campo-tags" placeholder="Separadas por vírgula" />
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="modal-excluir" style="margin-right:auto; color:var(--danger); display:none;">Excluir arquivo</button>
+        <button class="btn btn-secondary" id="modal-cancelar">Cancelar</button>
+        <button class="btn btn-primary" id="modal-salvar">Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <script>const CTF_RAIZ = "../";</script>
+
+  <script src="../assets/js/utils.js"></script>
+  <script src="../assets/js/events.js"></script>
+  <script src="../assets/js/config.js"></script>
+  <script src="../assets/js/auth.js"></script>
+  <script src="../assets/js/db.js"></script>
+  <script src="../assets/js/idb-arquivos.js"></script>
+  <script src="../assets/js/catalogo-menu.js"></script>
+  <script src="../assets/js/partials.js"></script>
+  <script src="../assets/js/app-shell.js" defer></script>
+
+  <script defer>
+    let arquivoPendente = null; // { file } aguardando metadados antes de persistir
+    let filtroTexto = "";
+
+    function iconePorExtensao(nome) {
+      const ext = (nome.split(".").pop() || "").toLowerCase();
+      const icones = {
+        pdf: '<path d="M7 3h7l4 4v14a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M14 3v4h4"/><path d="M8.5 14.5h1.2a1 1 0 0 0 0-2H8.5v4"/>',
+        doc: '<path d="M7 3h7l4 4v14a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M14 3v4h4"/><path d="M8 12h8M8 15h8M8 18h5"/>',
+        xls: '<path d="M7 3h7l4 4v14a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M14 3v4h4"/><path d="m9 12 6 6m0-6-6 6"/>',
+        img: '<rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10.5" r="1.5"/><path d="m21 15-5-5L5 21"/>',
+      };
+      if (["pdf"].includes(ext)) return icones.pdf;
+      if (["doc", "docx"].includes(ext)) return icones.doc;
+      if (["xls", "xlsx", "csv"].includes(ext)) return icones.xls;
+      if (["png", "jpg", "jpeg", "gif", "webp", "svg"].includes(ext)) return icones.img;
+      return '<path d="M7 3h7l4 4v14a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M14 3v4h4"/>';
+    }
+
+    function popularFiltrosEModal() {
+      const clientes = getAll("clientes").sort((a, b) => a.nome.localeCompare(b.nome));
+      const projetos = getAll("projetos").sort((a, b) => a.nome.localeCompare(b.nome));
+
+      document.getElementById("filtro-cliente").innerHTML =
+        '<option value="">Todos os clientes</option>' + clientes.map((c) => `<option value="${c.id}">${c.nome}</option>`).join("");
+      document.getElementById("filtro-projeto").innerHTML =
+        '<option value="">Todos os projetos</option>' + projetos.map((p) => `<option value="${p.id}">${p.nome}</option>`).join("");
+      document.getElementById("campo-cliente").innerHTML =
+        '<option value="">Nenhum</option>' + clientes.map((c) => `<option value="${c.id}">${c.nome}</option>`).join("");
+      document.getElementById("campo-projeto").innerHTML =
+        '<option value="">Nenhum</option>' + projetos.map((p) => `<option value="${p.id}">${p.nome}</option>`).join("");
+    }
+
+    function cardArquivo(arquivo) {
+      const cliente = arquivo.clienteId ? getPorId("clientes", arquivo.clienteId) : null;
+      const projeto = arquivo.projetoId ? getPorId("projetos", arquivo.projetoId) : null;
+      const tags = (arquivo.tags || []).map((t) => `<span class="badge badge--muted">${t}</span>`).join("");
+
+      return `
+        <div class="card arquivo-card">
+          <div style="display:flex; gap:10px; align-items:flex-start;">
+            <div class="arquivo-icone"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">${iconePorExtensao(arquivo.nome)}</svg></div>
+            <div style="flex:1; min-width:0;">
+              <div class="arquivo-nome" title="${arquivo.nome}">${arquivo.nome}</div>
+              <div style="font-size:12px; color:var(--muted);">${formatarTamanho(arquivo.tamanho)} • ${formatarData(arquivo.criadoEm)}</div>
+            </div>
+          </div>
+
+          ${cliente || projeto ? `<div style="display:flex; flex-direction:column; gap:4px;">
+            ${cliente ? `<span class="client-tag"><span class="client-dot" style="background:${cliente.cor}"></span>${cliente.nome}</span>` : ""}
+            ${projeto ? `<span class="client-tag">📁 ${projeto.nome}</span>` : ""}
+          </div>` : ""}
+
+          ${arquivo.categoria ? `<span class="badge badge--accent">${arquivo.categoria}</span>` : ""}
+          ${tags ? `<div class="arquivo-tags">${tags}</div>` : ""}
+
+          <div style="display:flex; gap:4px; margin-top:4px;">
+            <button class="btn btn-secondary" style="flex:1; height:30px; font-size:12px;" data-baixar="${arquivo.id}">Baixar</button>
+            <button class="icon-btn" data-editar="${arquivo.id}" title="Editar detalhes">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
+            </button>
+            <button class="icon-btn excluir" data-excluir="${arquivo.id}" title="Excluir">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m2 0-1 14a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1L5 6"/></svg>
+            </button>
+          </div>
+        </div>`;
+    }
+
+    function renderizarArquivos() {
+      const filtroCliente = document.getElementById("filtro-cliente").value;
+      const filtroProjeto = document.getElementById("filtro-projeto").value;
+
+      const arquivos = getAll("arquivos")
+        .filter((a) => a.nome.toLowerCase().includes(filtroTexto.toLowerCase()))
+        .filter((a) => !filtroCliente || a.clienteId === filtroCliente)
+        .filter((a) => !filtroProjeto || a.projetoId === filtroProjeto)
+        .sort((a, b) => b.criadoEm.localeCompare(a.criadoEm));
+
+      const lista = document.getElementById("lista-arquivos");
+      const vazio = document.getElementById("estado-vazio");
+      lista.innerHTML = arquivos.map(cardArquivo).join("");
+      vazio.hidden = arquivos.length !== 0;
+    }
+
+    /* ---------- Upload ---------- */
+    document.getElementById("botao-enviar").addEventListener("click", () => document.getElementById("input-arquivo").click());
+
+    document.getElementById("input-arquivo").addEventListener("change", (e) => {
+      const arquivo = e.target.files[0];
+      if (!arquivo) return;
+      arquivoPendente = arquivo;
+
+      document.getElementById("modal-arquivo-nome").textContent = `${arquivo.name} — ${formatarTamanho(arquivo.size)}`;
+      document.getElementById("campo-id").value = "";
+      document.getElementById("modal-excluir").style.display = "none";
+      document.getElementById("campo-cliente").value = "";
+      document.getElementById("campo-projeto").value = "";
+      document.getElementById("campo-categoria").value = "";
+      document.getElementById("campo-tags").value = "";
+      document.getElementById("modal-backdrop").hidden = false;
+      e.target.value = ""; // permite selecionar o mesmo arquivo de novo depois
+    });
+
+    function fecharModal() {
+      document.getElementById("modal-backdrop").hidden = true;
+      arquivoPendente = null;
+    }
+
+    async function salvarModal() {
+      const id = document.getElementById("campo-id").value;
+      const clienteId = document.getElementById("campo-cliente").value || null;
+      const projetoId = document.getElementById("campo-projeto").value || null;
+      const categoria = document.getElementById("campo-categoria").value.trim();
+      const tags = document.getElementById("campo-tags").value.split(",").map((t) => t.trim()).filter(Boolean);
+
+      if (id) {
+        // só editando metadados, o blob já existe no IndexedDB
+        atualizar("arquivos", id, { clienteId, projetoId, categoria, tags });
+      } else if (arquivoPendente) {
+        const registro = inserir("arquivos", {
+          nome: arquivoPendente.name,
+          tipo: arquivoPendente.type,
+          tamanho: arquivoPendente.size,
+          clienteId, projetoId, categoria, tags,
+        });
+        await salvarBlobArquivo(registro.id, arquivoPendente);
+      }
+      fecharModal();
+      renderizarArquivos();
+    }
+
+    function abrirModalEditar(id) {
+      const arquivo = getPorId("arquivos", id);
+      document.getElementById("modal-arquivo-nome").textContent = `${arquivo.nome} — ${formatarTamanho(arquivo.tamanho)}`;
+      document.getElementById("campo-id").value = arquivo.id;
+      document.getElementById("modal-excluir").style.display = "inline-flex";
+      document.getElementById("campo-cliente").value = arquivo.clienteId || "";
+      document.getElementById("campo-projeto").value = arquivo.projetoId || "";
+      document.getElementById("campo-categoria").value = arquivo.categoria || "";
+      document.getElementById("campo-tags").value = (arquivo.tags || []).join(", ");
+      document.getElementById("modal-backdrop").hidden = false;
+    }
+
+    async function excluirArquivo(id) {
+      const arquivo = getPorId("arquivos", id);
+      if (!confirm(`Excluir "${arquivo.nome}"? Esta ação não pode ser desfeita.`)) return;
+      await excluirBlobArquivo(id);
+      remover("arquivos", id);
+      renderizarArquivos();
+    }
+
+    async function baixarArquivo(id) {
+      const blob = await obterBlobArquivo(id);
+      const meta = getPorId("arquivos", id);
+      if (!blob) { alert("Não foi possível encontrar o conteúdo deste arquivo."); return; }
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = meta.nome;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    window.addEventListener("ctf:shell-pronto", () => {
+      popularFiltrosEModal();
+      renderizarArquivos();
+
+      document.getElementById("busca-global")?.addEventListener("input", (e) => {
+        filtroTexto = e.target.value;
+        renderizarArquivos();
+      });
+      document.getElementById("filtro-cliente").addEventListener("change", renderizarArquivos);
+      document.getElementById("filtro-projeto").addEventListener("change", renderizarArquivos);
+
+      onDadosMudarem("arquivos", renderizarArquivos);
+      onDadosMudarem("clientes", popularFiltrosEModal);
+      onDadosMudarem("projetos", popularFiltrosEModal);
+    });
+
+    document.getElementById("modal-fechar").addEventListener("click", fecharModal);
+    document.getElementById("modal-cancelar").addEventListener("click", fecharModal);
+    document.getElementById("modal-backdrop").addEventListener("click", (e) => { if (e.target.id === "modal-backdrop") fecharModal(); });
+    document.getElementById("modal-salvar").addEventListener("click", salvarModal);
+    document.getElementById("modal-excluir").addEventListener("click", () => {
+      const id = document.getElementById("campo-id").value;
+      fecharModal();
+      if (id) excluirArquivo(id);
+    });
+
+    document.getElementById("lista-arquivos").addEventListener("click", (e) => {
+      const baixar = e.target.closest("[data-baixar]");
+      if (baixar) return baixarArquivo(baixar.dataset.baixar);
+      const editar = e.target.closest("[data-editar]");
+      if (editar) return abrirModalEditar(editar.dataset.editar);
+      const excluir = e.target.closest("[data-excluir]");
+      if (excluir) return excluirArquivo(excluir.dataset.excluir);
+    });
+  </script>
+</body>
+</html>
