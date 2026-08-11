@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calculadora de Cadeiras</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f4f9;
+            color: #333;
+            display: flex;
+            justify-content: center;
+            padding: 40px 20px;
+            margin: 0;
+        }
+        .calculadora-container {
+            background-color: #fff;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 450px;
+        }
+        h2 {
+            margin-top: 0;
+            text-align: center;
+            color: #2c3e50;
+        }
+        label {
+            display: block;
+            margin-top: 15px;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+        select, input, button {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            box-sizing: border-box;
+            font-size: 16px;
+        }
+        input[type="number"] {
+            -moz-appearance: textfield;
+        }
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            cursor: pointer;
+            margin-top: 25px;
+            font-weight: bold;
+            transition: background 0.3s;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        .resultados {
+            margin-top: 25px;
+            padding: 20px;
+            background-color: #f8f9fa;
+            border-left: 4px solid #3498db;
+            border-radius: 4px;
+            display: none;
+        }
+        .resultados p {
+            margin: 10px 0;
+            font-size: 15px;
+            display: flex;
+            justify-content: space-between;
+        }
+        .resultados p strong {
+            color: #2c3e50;
+        }
+        .valor-destaque {
+            font-size: 18px;
+            font-weight: bold;
+            color: #27ae60;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="calculadora-container">
+        <h2>Calculadora de Valores</h2>
+        
+        <!-- Lista de cadeiras genéricas (pode ser substituída pelos seus modelos) -->
+        <label for="cadeira">Selecione a Cadeira:</label>
+        <select id="cadeira">
+            <option value="100">Cadeira Modelo A (R$ 100,00)</option>
+            <option value="150">Cadeira Modelo B (R$ 150,00)</option>
+            <option value="200">Cadeira Modelo C (R$ 200,00)</option>
+        </select>
+
+        <label for="multiplicador">Quantidade:</label>
+        <select id="multiplicador">
+            <option value="2">2 unidades</option>
+            <option value="4">4 unidades</option>
+            <option value="6">6 unidades</option>
+        </select>
+
+        <label for="valorBase">Valor a subtrair (Ex: 700):</label>
+        <input type="number" id="valorBase" placeholder="Insira o valor..." value="700">
+
+        <button onclick="calcular()">Calcular Resultado</button>
+
+        <div class="resultados" id="boxResultados">
+            <p>Total das Cadeiras: <span>R$ <span id="resCadeiras">0,00</span></span></p>
+            <p>Valor Origem (Diferença): <span>R$ <span id="resOrigem">0,00</span></span></p>
+            <p>Valor com +50%: <span>R$ <span id="res50">0,00</span></span></p>
+            <hr>
+            <p class="valor-destaque">Valor Final: <span>R$ <span id="resFinal">0,00</span></span></p>
+        </div>
+    </div>
+
+    <script>
+        function calcular() {
+            // 1. Captura os valores dos inputs
+            const precoCadeira = parseFloat(document.getElementById('cadeira').value);
+            const multiplicador = parseInt(document.getElementById('multiplicador').value);
+            const valorBase = parseFloat(document.getElementById('valorBase').value) || 0;
+
+            // 2. Multiplica o valor da cadeira pela quantidade (Ex: 100 * 4 = 400)
+            const totalCadeiras = precoCadeira * multiplicador;
+
+            // 3. Subtrai o total das cadeiras do valor inserido (Ex: 700 - 400 = 300)
+            // Usa Math.abs para garantir que a diferença não fique negativa caso o valor inserido seja menor
+            const valorOrigem = Math.abs(valorBase - totalCadeiras);
+
+            // 4. Adiciona 50% ao valor de origem (Ex: 300 * 1.5 = 450)
+            const valorCom50 = valorOrigem * 1.5;
+
+            // 5. Aplica a regra de arredondamento para terminar sempre em 9
+            // A lógica divide por 10, arredonda para baixo e soma 9. (Ex: 450 -> 45 -> 450 + 9 = 459)
+            const valorFinal = Math.floor(valorCom50 / 10) * 10 + 9;
+
+            // 6. Atualiza o HTML com os resultados formatados (substituindo ponto por vírgula)
+            document.getElementById('resCadeiras').innerText = totalCadeiras.toFixed(2).replace('.', ',');
+            document.getElementById('resOrigem').innerText = valorOrigem.toFixed(2).replace('.', ',');
+            document.getElementById('res50').innerText = valorCom50.toFixed(2).replace('.', ',');
+            document.getElementById('resFinal').innerText = valorFinal.toFixed(2).replace('.', ',');
+
+            // Mostra a caixa de resultados
+            document.getElementById('boxResultados').style.display = 'block';
+        }
+    </script>
+</body>
+</html>
