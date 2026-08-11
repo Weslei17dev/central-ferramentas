@@ -131,7 +131,7 @@ function ligarEventosSidebar() {
 }
 
 async function rerenderizarSidebar(raiz) {
-  document.getElementById("app-sidebar").innerHTML = sidebarHTML(raiz);
+  document.getElementById("app-sidebar").innerHTML = await sidebarHTML(raiz);
   destacarModuloAtivo();
   ligarEventosSidebar();
 }
@@ -148,7 +148,7 @@ async function iniciarAppShell() {
   if (typeof semearDadosIniciais === "function") semearDadosIniciais();
 
   document.getElementById("app-header").innerHTML = headerHTML(raiz);
-  document.getElementById("app-sidebar").innerHTML = sidebarHTML(raiz);
+  document.getElementById("app-sidebar").innerHTML = await sidebarHTML(raiz);
 
   aplicarTema(document.documentElement.dataset.theme || "dark");
   destacarModuloAtivo();

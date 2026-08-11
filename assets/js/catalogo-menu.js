@@ -65,28 +65,30 @@ function obterFerramentaCatalogo(chave) {
 }
 
 /** Ferramentas atribuídas a um grupo, na ordem em que foram atribuídas. */
-function ferramentasDoGrupo(grupoId) {
-  return getAll("menuAtribuicoes")
+async function ferramentasDoGrupo(grupoId) {
+  const atribuicoes = await getAll("menuAtribuicoes");
+  return atribuicoes
     .filter((a) => a.grupoId === grupoId)
     .map((a) => obterFerramentaCatalogo(a.ferramentaChave))
     .filter(Boolean);
 }
 
 /** Ferramentas que existem no catálogo mas ainda não foram postas em nenhum grupo. */
-function ferramentasSemGrupo() {
-  const atribuidas = new Set(getAll("menuAtribuicoes").map((a) => a.ferramentaChave));
+async function ferramentasSemGrupo() {
+  const atribuicoes = await getAll("menuAtribuicoes");
+  const atribuidas = new Set(atribuicoes.map((a) => a.ferramentaChave));
   return CATALOGO_FERRAMENTAS.filter((f) => !atribuidas.has(f.chave));
 }
 
 /** Move (ou remove, se grupoId for null) uma ferramenta para um grupo. */
-function moverFerramentaParaGrupo(ferramentaChave, grupoId) {
-  const atribuicoes = getAll("menuAtribuicoes");
+async function moverFerramentaParaGrupo(ferramentaChave, grupoId) {
+  const atribuicoes = await getAll("menuAtribuicoes");
   const existente = atribuicoes.find((a) => a.ferramentaChave === ferramentaChave);
   if (grupoId === null) {
-    if (existente) remover("menuAtribuicoes", existente.id);
+    if (existente) await remover("menuAtribuicoes", existente.id);
   } else if (existente) {
-    atualizar("menuAtribuicoes", existente.id, { grupoId });
+    await atualizar("menuAtribuicoes", existente.id, { grupoId });
   } else {
-    inserir("menuAtribuicoes", { ferramentaChave, grupoId });
+    await inserir("menuAtribuicoes", { ferramentaChave, grupoId });
   }
 }

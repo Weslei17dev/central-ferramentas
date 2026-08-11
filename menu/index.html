@@ -59,9 +59,15 @@
         </div>`;
     }
 
-    function renderizarQuadro() {
-      const grupos = getAll("menuGrupos").sort((a, b) => a.ordem - b.ordem);
+    async function renderizarQuadro() {
+      const todosGrupos = await getAll("menuGrupos");
+      const grupos = todosGrupos.sort((a, b) => a.ordem - b.ordem);
       const quadro = document.getElementById("quadro-grupos");
+
+      // Busca as ferramentas de cada grupo em paralelo antes de montar o HTML
+      // (ferramentasDoGrupo/ferramentasSemGrupo agora são assíncronas).
+      const ferramentasPorGrupo = await Promise.all(grupos.map((g) => ferramentasDoGrupo(g.id)));
+      const semGrupo = await ferramentasSemGrupo();
 
       const colunasGrupos = grupos.map((g, i) => `
         <div class="kanban-coluna" data-grupo="${g.id}" style="min-width:240px;">
@@ -80,7 +86,7 @@
             </div>
           </div>
           <div class="kanban-lista" data-drop-grupo="${g.id}" style="min-height:80px;">
-            ${ferramentasDoGrupo(g.id).map(cardFerramenta).join("")}
+            ${ferramentasPorGrupo[i].map(cardFerramenta).join("")}
           </div>
         </div>`).join("");
 
@@ -90,7 +96,7 @@
             <span class="coluna-grupo-nome" style="cursor:default;">Sem grupo (não aparece na sidebar)</span>
           </div>
           <div class="kanban-lista" data-drop-grupo="${SEM_GRUPO}" style="min-height:80px;">
-            ${ferramentasSemGrupo().map(cardFerramenta).join("")}
+            ${semGrupo.map(cardFerramenta).join("")}
           </div>
         </div>`;
 
@@ -110,13 +116,13 @@
       document.querySelectorAll("[data-drop-grupo]").forEach((zona) => {
         zona.addEventListener("dragover", (e) => { e.preventDefault(); zona.closest(".kanban-coluna").classList.add("arrastando-sobre"); });
         zona.addEventListener("dragleave", () => zona.closest(".kanban-coluna").classList.remove("arrastando-sobre"));
-        zona.addEventListener("drop", (e) => {
+        zona.addEventListener("drop", async (e) => {
           e.preventDefault();
           zona.closest(".kanban-coluna").classList.remove("arrastando-sobre");
           const chave = e.dataTransfer.getData("text/plain");
           const grupoId = zona.dataset.dropGrupo === SEM_GRUPO ? null : zona.dataset.dropGrupo;
-          moverFerramentaParaGrupo(chave, grupoId);
-          renderizarQuadro();
+          await moverFerramentaParaGrupo(chave, grupoId);
+          await renderizarQuadro();
         });
       });
     }
@@ -131,35 +137,37 @@
       });
     }
 
-    function moverGrupo(id, direcao) {
-      const grupos = getAll("menuGrupos").sort((a, b) => a.ordem - b.ordem);
+    async function moverGrupo(id, direcao) {
+      const todosGrupos = await getAll("menuGrupos");
+      const grupos = todosGrupos.sort((a, b) => a.ordem - b.ordem);
       const indice = grupos.findIndex((g) => g.id === id);
       const novoIndice = indice + direcao;
       if (novoIndice < 0 || novoIndice >= grupos.length) return;
       const a = grupos[indice], b = grupos[novoIndice];
-      atualizar("menuGrupos", a.id, { ordem: b.ordem });
-      atualizar("menuGrupos", b.id, { ordem: a.ordem });
-      renderizarQuadro();
+      await atualizar("menuGrupos", a.id, { ordem: b.ordem });
+      await atualizar("menuGrupos", b.id, { ordem: a.ordem });
+      await renderizarQuadro();
     }
 
-    function excluirGrupo(id) {
-      const grupo = getPorId("menuGrupos", id);
+    async function excluirGrupo(id) {
+      const grupo = await getPorId("menuGrupos", id);
       if (!confirm(`Excluir o grupo "${grupo.nome}"? As ferramentas dele voltam para "Sem grupo" (não somem do sistema).`)) return;
-      getAll("menuAtribuicoes").filter((a) => a.grupoId === id).forEach((a) => remover("menuAtribuicoes", a.id));
-      remover("menuGrupos", id);
-      renderizarQuadro();
+      const atribuicoes = await getAll("menuAtribuicoes");
+      await Promise.all(atribuicoes.filter((a) => a.grupoId === id).map((a) => remover("menuAtribuicoes", a.id)));
+      await remover("menuGrupos", id);
+      await renderizarQuadro();
     }
 
     window.addEventListener("ctf:shell-pronto", renderizarQuadro);
 
-    document.getElementById("botao-novo-grupo").addEventListener("click", () => {
+    document.getElementById("botao-novo-grupo").addEventListener("click", async () => {
       const nome = document.getElementById("campo-novo-grupo").value.trim();
       if (!nome) return;
-      const grupos = getAll("menuGrupos");
+      const grupos = await getAll("menuGrupos");
       const maiorOrdem = grupos.length ? Math.max(...grupos.map((g) => g.ordem)) : 0;
-      inserir("menuGrupos", { nome, ordem: maiorOrdem + 1 });
+      await inserir("menuGrupos", { nome, ordem: maiorOrdem + 1 });
       document.getElementById("campo-novo-grupo").value = "";
-      renderizarQuadro();
+      await renderizarQuadro();
     });
 
     document.getElementById("quadro-grupos").addEventListener("click", (e) => {

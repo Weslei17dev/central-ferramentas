@@ -24,8 +24,8 @@ function navItemHTML(ferramenta, raiz) {
     </a>`;
 }
 
-function grupoHTML(grupo, raiz, expandido) {
-  const itens = ferramentasDoGrupo(grupo.id);
+async function grupoHTML(grupo, raiz, expandido) {
+  const itens = await ferramentasDoGrupo(grupo.id);
   if (itens.length === 0) return ""; // grupo sem nenhuma ferramenta não aparece
   return `
     <div class="sidebar-section">
@@ -39,12 +39,15 @@ function grupoHTML(grupo, raiz, expandido) {
     </div>`;
 }
 
-function sidebarHTML(raiz) {
+async function sidebarHTML(raiz) {
   const estadoExpandido = JSON.parse(localStorage.getItem("ctf_menu_expandido") || "{}");
-  const grupos = getAll("menuGrupos").sort((a, b) => a.ordem - b.ordem);
-  const gruposHTML = grupos.map((g) => grupoHTML(g, raiz, estadoExpandido[g.id] !== false)).join("");
+  const todosGrupos = await getAll("menuGrupos");
+  const grupos = todosGrupos.sort((a, b) => a.ordem - b.ordem);
+  const gruposHTML = (await Promise.all(
+    grupos.map((g) => grupoHTML(g, raiz, estadoExpandido[g.id] !== false))
+  )).join("");
 
-  const semGrupo = ferramentasSemGrupo();
+  const semGrupo = await ferramentasSemGrupo();
   const semGrupoHTML = semGrupo.length ? `
     <div class="sidebar-section">
       <div class="sidebar-section-title">Outros</div>

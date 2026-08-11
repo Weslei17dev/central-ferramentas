@@ -6,4 +6,4 @@
 
 // URL da API publicada na Render, SEM barra no final.
 // Exemplo: "https://central-de-ferramentas-api.onrender.com"
-const API_BASE_URL = "https://central-ferramentas.onrender.com";
+const API_BASE_URL = "COLE_AQUI_A_URL_DA_API_NA_RENDER";
