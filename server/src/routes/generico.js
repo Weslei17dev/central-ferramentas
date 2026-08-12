@@ -21,7 +21,7 @@ const TABELAS_PERMITIDAS = new Set([
   "arquivos", "tickets", "ticket_comentarios", "ticket_tempos",
   "categorias", "snippets", "artigos", "prompts",
   "metricas", "relatorios", "layouts",
-  "logs", "menu_grupos", "menu_atribuicoes",
+  "logs", "menu_grupos", "menu_atribuicoes", "favoritos",
 ]);
 
 // Nome de coluna só pode ser um identificador "normal" (snake_case) — isso

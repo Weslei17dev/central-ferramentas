@@ -356,6 +356,19 @@ CREATE TABLE menu_atribuicoes (
 );
 
 -- ==========================================================================
+-- FAVORITOS (usado por Clientes, Projetos, Snippets, Artigos, Prompts —
+-- o coraçãozinho de favoritar na sidebar)
+-- ==========================================================================
+
+CREATE TABLE favoritos (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  tipo text NOT NULL,   -- cliente|projeto|snippet|artigo|prompt
+  ref_id uuid NOT NULL,
+  criado_por uuid REFERENCES usuarios(id) ON DELETE SET NULL,
+  criado_em timestamptz NOT NULL DEFAULT now()
+);
+
+-- ==========================================================================
 -- Dados iniciais (equivalentes ao que semearDadosIniciais() criava local)
 -- ==========================================================================
 
